@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Generator_Service26_Server.Model.Dtos;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -21,12 +22,12 @@ namespace GraphModule
 
         // ========== РАБОТА С УЗЛАМИ ==========
 
-        public Node AddNode(int id, object value = null)
+        public Node AddNode(int id, object value = null, NodeType type = NodeType.Transitive)
         {
             if (nodes.ContainsKey(id))
                 throw new ArgumentException($"Узел с ID {id} уже существует");
 
-            var node = new Node(id, value);
+            var node = new Node(id, value, type);
             nodes[id] = node;
             adjacencyList[node] = new List<Edge>();
             return node;

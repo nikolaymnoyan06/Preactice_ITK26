@@ -1,6 +1,7 @@
 ﻿using Bogus;
 using GraphModule;
-
+using Generator_Service26_Server.Model;
+using Generator_Service26_Server.Model.Dtos;
 namespace Generator_Service26_Server.Model
 {
     public class Generator
@@ -16,8 +17,8 @@ namespace Generator_Service26_Server.Model
         {
             var faker = new Faker<Node>()
                 .RuleFor(n => n.Id, f => f.UniqueIndex + 1)
-                .RuleFor(n => n.Value, f => f.Lorem.Word());
-
+                .RuleFor(n => n.Value, f => f.Lorem.Word())
+                .RuleFor(n => n.Type, f => f.PickRandom<NodeType>()); // случайный тип
             var nodes = faker.Generate(count);
 
             foreach (var node in nodes)

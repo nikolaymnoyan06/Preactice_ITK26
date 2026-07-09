@@ -1,8 +1,9 @@
-using Generator_Service26.Model.Dtos;
 using Generator_Service26;
 using Generator_Service26.Model;// для GraphDataGenerator (если он в корне)
+using Generator_Service26.Model.Dtos;
 using Generator_Service26_Server;
 using Generator_Service26_Server.Model; // для NodeDto и EdgeDto
+using Generator_Service26_Server.Model.Dtos;
 using GraphModule;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,17 +18,7 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Добавляем эндпоинт /api/users (можно удалить, если не нужен)
-app.MapGet("/api/users", () =>
-{
-    var users = new[]
-    {
-        new { Id = 1, Name = "Иван Иванов" },
-        new { Id = 2, Name = "Петр Петров" },
-        new { Id = 3, Name = "Сидор Сидоров" }
-    };
-    return Results.Ok(users);
-});
+
 
 // 1. Получить все узлы
 app.MapGet("/api/nodes", (Graph graph) =>
@@ -36,7 +27,8 @@ app.MapGet("/api/nodes", (Graph graph) =>
     var result = nodes.Select(n => new NodeDto
     {
         Id = n.Id,
-        Value = n.Value
+        Value = n.Value,
+        Type = n.Type   // ← вот это замените
     });
     return Results.Ok(result);
 });
@@ -46,7 +38,7 @@ app.MapPost("/api/nodes", (NodeDto dto, Graph graph) =>
 {
     try
     {
-        graph.AddNode(dto.Id, dto.Value);
+        graph.AddNode(dto.Id, dto.Value, dto.Type);
         return Results.Ok(new { message = "Узел добавлен", id = dto.Id });
     }
     catch (ArgumentException ex)

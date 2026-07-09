@@ -18,14 +18,20 @@
 
 		<!-- Список узлов -->
 		<ListBox ItemsSource="{Binding Nodes}"
-                 SelectedItem="{Binding SelectedNode}"
-                 DisplayMemberBinding="{Binding Value}"
-                 Height="200" Margin="0,10,0,10"/>
-
+         SelectedItem="{Binding SelectedNode}"
+         Height="200" Margin="0,10,0,10">
+			<ListBox.ItemTemplate>
+				<DataTemplate>
+					<TextBlock Text="{Binding}" />
+				</DataTemplate>
+			</ListBox.ItemTemplate>
+		</ListBox>
 		<!-- Поля для добавления -->
 		<StackPanel Orientation="Horizontal" Spacing="10" Margin="0,5">
 			<TextBox Width="100" Watermark="ID" Text="{Binding NewNodeId}"/>
 			<TextBox Width="200" Watermark="Value" Text="{Binding NewNodeValue}"/>
+			<ComboBox Width="120" ItemsSource="{Binding NodeTypes}"
+              SelectedItem="{Binding SelectedNodeType}"/>
 			<Button Content="Добавить" Command="{Binding AddNodeCommand}"/>
 		</StackPanel>
 

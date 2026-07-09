@@ -1,10 +1,15 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using Client.Dtos;
+using Client.Models;
+using Client.Models.Dtos;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Client.Dtos;
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace Client.ViewModels
@@ -61,6 +66,18 @@ namespace Client.ViewModels
                 }
             }
         }
+        // Список типов для выпадающего списка
+        public ObservableCollection<NodeType> NodeTypes { get; } = new ObservableCollection<NodeType>(
+            Enum.GetValues(typeof(NodeType)).Cast<NodeType>()
+        );
+
+        private NodeType _selectedNodeType = NodeType.Transitive;
+        public NodeType SelectedNodeType
+        {
+            get => _selectedNodeType;
+            set => SetProperty(ref _selectedNodeType, value);
+        }
+
         // ========== РЁБРА ==========
         private ObservableCollection<EdgeDto> _edges = new ObservableCollection<EdgeDto>();
         public ObservableCollection<EdgeDto> Edges
@@ -209,7 +226,9 @@ namespace Client.ViewModels
 
                 System.Diagnostics.Debug.WriteLine($"ID: {id}, Value: {NewNodeValue}");
 
-                var dto = new NodeDto { Id = id, Value = NewNodeValue };
+                System.Diagnostics.Debug.WriteLine($"Перед отправкой: SelectedNodeType = {SelectedNodeType}");
+
+                var dto = new NodeDto { Id = id, Value = NewNodeValue, Type = SelectedNodeType };
                 using var httpClient = new HttpClient();
 
                 System.Diagnostics.Debug.WriteLine($"Отправка POST на {_baseUrl}/api/nodes");
@@ -262,6 +281,11 @@ namespace Client.ViewModels
                 Greeting = $"Ошибка: {ex.Message}";
             }
         }
+
+        private readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+        {
+            Converters = { new JsonStringEnumConverter() }
+        };
 
         // ========== МЕТОДЫ ДЛЯ РЁБЕР ==========
 

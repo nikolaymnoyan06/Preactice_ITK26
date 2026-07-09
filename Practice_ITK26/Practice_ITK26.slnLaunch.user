@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "Новый профиль",
+    "Projects": [
+      {
+        "Path": "Client\\Client.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "Generator_Service26\\Generator_Service26_Server\\Generator_Service26_Server.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

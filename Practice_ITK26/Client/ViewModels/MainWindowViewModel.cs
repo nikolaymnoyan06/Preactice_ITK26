@@ -1,5 +1,4 @@
 ﻿using Client.Dtos;
-using Client.Models;
 using Client.Models.Dtos;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;

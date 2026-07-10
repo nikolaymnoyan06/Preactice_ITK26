@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Client.Models.Dtos
+﻿namespace Client.Models.Dtos
 {
     /// <summary>
     /// Перечисление возможных типов узлов графа.

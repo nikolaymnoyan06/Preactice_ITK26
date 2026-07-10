@@ -1,8 +1,4 @@
-﻿﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Client.Dtos
+﻿namespace Client.Dtos
 {
     /// <summary>
     /// Data Transfer Object (DTO) для представления ребра графа.

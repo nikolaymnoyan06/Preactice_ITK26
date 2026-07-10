@@ -1,150 +1,117 @@
-using Generator_Service26;
-using Generator_Service26.Model;// для GraphDataGenerator (если он в корне)
 using Generator_Service26.Model.Dtos;
-using Generator_Service26_Server;
-using Generator_Service26_Server.Model; // для NodeDto и EdgeDto
+using Generator_Service26_Server.Model;
 using Generator_Service26_Server.Model.Dtos;
-using GraphModule;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.WebHost.UseUrls("http://localhost:5000");
 
-// Регистрируем граф как синглтон
-builder.Services.AddSingleton<GraphModule.Graph>(provider => new GraphModule.Graph(isDirected: false));
+/// <summary>Настройка JSON: Enum -> строки.</summary>
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 
-// Add services to the container.
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+// ============================================================
+// ХРАНИЛИЩЕ В ПАМЯТИ
+// ============================================================
 
+/// <summary>Хранилище узлов и рёбер в оперативной памяти.</summary>
+var nodes = new List<NodeDto>();
+var edges = new List<EdgeDto>();
 
-// 1. Получить все узлы
-app.MapGet("/api/nodes", (Graph graph) =>
+// ============================================================
+// ЭНДПОИНТЫ УЗЛОВ
+// ============================================================
+
+/// <summary>Получить все узлы.</summary>
+app.MapGet("/api/nodes", () => Results.Ok(nodes));
+
+/// <summary>Добавить новый узел.</summary>
+app.MapPost("/api/nodes", (NodeDto dto) =>
 {
-    var nodes = graph.GetAllNodes();
-    var result = nodes.Select(n => new NodeDto
-    {
-        Id = n.Id,
-        Value = n.Value,
-        Type = n.Type   // ← вот это замените
-    });
-    return Results.Ok(result);
+    if (nodes.Any(n => n.Id == dto.Id))
+        return Results.BadRequest(new { error = "Узел с таким ID уже существует" });
+
+    nodes.Add(dto);
+    return Results.Ok(new { message = "Узел добавлен", id = dto.Id });
 });
 
-// 2. Добавить новый узел
-app.MapPost("/api/nodes", (NodeDto dto, Graph graph) =>
+/// <summary>Удалить узел по ID (вместе со связанными рёбрами).</summary>
+app.MapDelete("/api/nodes/{id}", (int id) =>
 {
-    try
-    {
-        graph.AddNode(dto.Id, dto.Value, dto.Type);
-        return Results.Ok(new { message = "Узел добавлен", id = dto.Id });
-    }
-    catch (ArgumentException ex)
-    {
-        return Results.BadRequest(new { error = ex.Message });
-    }
+    var node = nodes.FirstOrDefault(n => n.Id == id);
+    if (node == null) return Results.NotFound(new { error = "Узел не найден" });
+
+    nodes.Remove(node);
+    edges.RemoveAll(e => e.SourceId == id || e.TargetId == id); // Удаляем рёбра
+
+    return Results.Ok(new { message = "Узел удален", id = id });
 });
 
-// 3. Удалить узел по ID
-app.MapDelete("/api/nodes/{id}", (int id, Graph graph) =>
+/// <summary>Сгенерировать узлы через Generator.</summary>
+app.MapPost("/api/generate-nodes", (int count) =>
 {
-    var success = graph.RemoveNode(id);
-    if (success)
+    if (count <= 0 || count > 100)
+        return Results.BadRequest("Количество должно быть от 1 до 100");
+
+    var generator = new Generator();
+    var newNodes = generator.GenerateNodes(count);
+
+    foreach (var node in newNodes)
     {
-        return Results.Ok(new { message = "Узел удален", id = id });
+        if (!nodes.Any(n => n.Id == node.Id)) // Если ID свободен
+        {
+            nodes.Add(node);
+        }
     }
-    else
-    {
-        return Results.NotFound(new { error = "Узел не найден" });
-    }
+
+    return Results.Ok(new { message = $"Сгенерировано {count} узлов", totalNodes = nodes.Count });
 });
 
-// Configure the HTTP request pipeline.
+// ============================================================
+// ЭНДПОИНТЫ РЁБЕР
+// ============================================================
+
+/// <summary>Получить все рёбра.</summary>
+app.MapGet("/api/edges", () => Results.Ok(edges));
+
+/// <summary>Добавить ребро между узлами.</summary>
+app.MapPost("/api/edges", (EdgeDto dto) =>
+{
+    if (!nodes.Any(n => n.Id == dto.SourceId))
+        return Results.BadRequest($"Узел-источник {dto.SourceId} не найден");
+    if (!nodes.Any(n => n.Id == dto.TargetId))
+        return Results.BadRequest($"Узел-приёмник {dto.TargetId} не найден");
+
+    if (dto.Id == 0) dto.Id = edges.Count + 1; // Авто-ID, если не указан
+
+    edges.Add(dto);
+    return Results.Ok(new { message = "Ребро добавлено", id = dto.Id });
+});
+
+/// <summary>Удалить ребро по ID.</summary>
+app.MapDelete("/api/edges/{id}", (int id) =>
+{
+    var edge = edges.FirstOrDefault(e => e.Id == id);
+    if (edge == null) return Results.NotFound("Ребро не найдено");
+
+    edges.Remove(edge);
+    return Results.Ok(new { message = "Ребро удалено" });
+});
+
+// ============================================================
+// ОКРУЖЕНИЕ
+// ============================================================
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-//app.UseHttpsRedirection();
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
-
-// Генерация узлов
-app.MapPost("/api/generate-nodes", (int count, Graph graph) =>
-{
-    if (count <= 0 || count > 100)
-        return Results.BadRequest("Количество должно быть от 1 до 100");
-
-    var generator = new Generator(graph); // теперь класс виден
-    generator.GenerateNodes(count);
-    return Results.Ok(new { message = $"Сгенерировано {count} узлов", totalNodes = graph.GetNodeCount() });
-});
-
-// Получить все рёбра
-app.MapGet("/api/edges", (Graph graph) =>
-{
-    var edges = graph.GetAllEdges();
-    var result = edges.Select(e => new EdgeDto
-    {
-        Id = e.Id,
-        SourceId = e.Source.Id,
-        TargetId = e.Target.Id,
-        Weight = e.Weight
-    });
-    return Results.Ok(result);
-});
-
-// Добавить ребро
-app.MapPost("/api/edges", (EdgeDto dto, Graph graph) =>
-{
-    try
-    {
-        if (!graph.ContainsNode(dto.SourceId) || !graph.ContainsNode(dto.TargetId))
-            return Results.BadRequest("Один из узлов не найден");
-
-        var edge = graph.AddEdge(dto.SourceId, dto.TargetId, dto.Weight);
-        return Results.Ok(new { message = "Ребро добавлено", id = edge.Id });
-    }
-    catch (Exception ex)
-    {
-        return Results.BadRequest(new { error = ex.Message });
-    }
-});
-
-// Удалить ребро по ID
-app.MapDelete("/api/edges/{id}", (int id, Graph graph) =>
-{
-    var allEdges = graph.GetAllEdges();
-    var edge = allEdges.FirstOrDefault(e => e.Id == id);
-    if (edge == null)
-        return Results.NotFound("Ребро не найдено");
-
-    graph.RemoveEdge(edge);
-    return Results.Ok(new { message = "Ребро удалено" });
-});
-
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

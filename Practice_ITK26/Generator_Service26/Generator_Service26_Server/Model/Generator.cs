@@ -5,18 +5,10 @@ using System.Collections.Generic;
 
 namespace Generator_Service26_Server.Model
 {
+    /// <summary>Генератор тестовых узлов на основе DTO.</summary>
     public class Generator
     {
-        // Убрали поле _graph. Генератор теперь не хранит граф, а только создает данные.
-
-        public Generator()
-        {
-            // Конструктор теперь пустой
-        }
-
-        /// <summary>
-        /// Генерирует список объектов NodeDto.
-        /// </summary>
+        /// <summary>Генерирует список объектов NodeDto.</summary>
         public List<NodeDto> GenerateNodes(int count)
         {
             // Создаем фейкер исключительно для NodeDto

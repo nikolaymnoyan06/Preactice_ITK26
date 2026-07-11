@@ -1,37 +1,24 @@
 ﻿using Bogus;
-using GraphModule;
-using Generator_Service26_Server.Model;
+using Generator_Service26.Model.Dtos;
 using Generator_Service26_Server.Model.Dtos;
+using System.Collections.Generic;
+
 namespace Generator_Service26_Server.Model
 {
+    /// <summary>Генератор тестовых узлов на основе DTO.</summary>
     public class Generator
     {
-        private readonly Graph _graph;
-
-        public Generator(Graph graph)
+        /// <summary>Генерирует список объектов NodeDto.</summary>
+        public List<NodeDto> GenerateNodes(int count)
         {
-            _graph = graph;
-        }
+            // Создаем фейкер исключительно для NodeDto
+            var faker = new Faker<NodeDto>()
+                .RuleFor(n => n.Id, f => f.UniqueIndex + 1)                  // Уникальный ID
+                .RuleFor(n => n.Value, f => f.Lorem.Word())                  // Случайное текстовое значение
+                .RuleFor(n => n.Type, f => f.PickRandom<NodeType>());        // Случайный тип из DTO
 
-        public void GenerateNodes(int count)
-        {
-            var faker = new Faker<Node>()
-                .RuleFor(n => n.Id, f => f.UniqueIndex + 1)
-                .RuleFor(n => n.Value, f => f.Lorem.Word())
-                .RuleFor(n => n.Type, f => f.PickRandom<NodeType>()); // случайный тип
-            var nodes = faker.Generate(count);
-
-            foreach (var node in nodes)
-            {
-                try
-                {
-                    _graph.AddNode(node.Id, node.Value);
-                }
-                catch (ArgumentException)
-                {
-                    // если узел с таким ID уже существует – пропускаем
-                }
-            }
+            // Возвращаем сгенерированный список DTO
+            return faker.Generate(count);
         }
     }
 }

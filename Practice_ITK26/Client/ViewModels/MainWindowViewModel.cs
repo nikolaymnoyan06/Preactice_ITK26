@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace Client.ViewModels
 {
-    public class MainWindowViewModel : ObservableObject
+    public partial class MainWindowViewModel : ObservableObject
     {
         private string _greeting = "Граф";
         public string Greeting
@@ -552,5 +552,13 @@ namespace Client.ViewModels
         }
 
         #endregion
+
+        private bool _showNodeDetails;
+        public bool ShowNodeDetails
+        {
+            get => _showNodeDetails;
+            set => SetProperty(ref _showNodeDetails, value);
+        }
+
     }
 }

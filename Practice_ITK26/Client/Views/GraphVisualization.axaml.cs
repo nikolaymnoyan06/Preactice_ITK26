@@ -57,6 +57,15 @@ namespace Client.Views
             set => SetValue(EdgesProperty, value);
         }
 
+        public static readonly StyledProperty<bool> ShowDetailsProperty =
+            AvaloniaProperty.Register<GraphVisualization, bool>(nameof(ShowDetails));
+
+        public bool ShowDetails
+        {
+            get => GetValue(ShowDetailsProperty);
+            set => SetValue(ShowDetailsProperty, value);
+        }
+
         /// <summary>
         /// Пытается найти случайную позицию, которая не пересекается с уже занятыми.
         /// </summary>
@@ -160,6 +169,12 @@ namespace Client.Views
                     OnEdgesCollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
                 }
             }
+
+            if (change.Property == ShowDetailsProperty)
+            {
+                Redraw();
+            }
+
         }
 
         private void OnNodesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -308,6 +323,28 @@ namespace Client.Views
                         HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
                         VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
                     };
+
+                    // ===== НАД узлом: ID и тип =====
+                    if (ShowDetails)
+                    {
+                        string typeAbbr = node.Type.ToString().ToUpper();
+                        if (typeAbbr == "CONSUMER") typeAbbr = "CONS";
+                        else if (typeAbbr == "SOURCE") typeAbbr = "SOUR";
+                        else if (typeAbbr == "TRANSITIVE") typeAbbr = "TRANS";
+
+                        var details = new TextBlock
+                        {
+                            Text = $"ID{node.Id} - {typeAbbr}",
+                            FontSize = 9,
+                            Foreground = Brushes.DarkBlue,
+                            FontWeight = Avalonia.Media.FontWeight.Bold,
+                            Background = new SolidColorBrush(Colors.WhiteSmoke)
+                        };
+                        Canvas.SetLeft(details, pos.X - 25);
+                        Canvas.SetTop(details, pos.Y - 40);
+                        canvas.Children.Add(details);
+                    }
+
                     // Располагаем под эллипсом (чуть ниже и с центрированием)
                     Canvas.SetLeft(text, pos.X - 30);   // примерное центрирование (60px ширина)
                     Canvas.SetTop(text, pos.Y + 22);    // сразу под кругом

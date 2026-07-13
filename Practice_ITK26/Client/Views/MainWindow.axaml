@@ -14,6 +14,10 @@
 		<vm:MainWindowViewModel/>
 	</Design.DataContext>
 
+	<TabControl Margin="10">
+		<!-- Вкладка 1: Управление графом -->
+		<TabItem Header="Управление">
+	
 	<Grid Margin="20" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
 
 		<!-- Заголовок -->
@@ -129,6 +133,17 @@
                         Command="{Binding LoadEdgesCommand}"/>
 			</StackPanel>
 		</StackPanel>
+		
 
+		
 	</Grid>
+		</TabItem>
+		<!-- Вкладка 2: Визуализация графа -->
+		<TabItem Header="Визуализация">
+			<StackPanel Margin="10">
+				<TextBlock Text="Здесь будет графическое отображение графа" FontSize="16" HorizontalAlignment="Center"/>
+				<!-- Позже здесь появится Canvas или элемент для рисования -->
+			</StackPanel>
+		</TabItem>
+	</TabControl>
 </Window>

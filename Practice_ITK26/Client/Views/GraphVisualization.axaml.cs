@@ -129,6 +129,9 @@ namespace Client.Views
                     };
                     canvas.Children.Add(line);
 
+                    // Рисуем стрелку на конце (у target)
+                    DrawArrow(canvas, sourcePos, targetPos, _edgePen.Brush);
+
                     // Подпись веса (теперь просто edge.Weight, без .Value)
                     var weightText = edge.Weight.ToString("0.0");
                     var midX = (sourcePos.X + targetPos.X) / 2;
@@ -217,5 +220,35 @@ namespace Client.Views
             _isDragging = false;
             _draggedNodeId = null;
         }
+
+        private void DrawArrow(Canvas canvas, Point from, Point to, IBrush brush, double arrowSize = 12)
+        {
+            var direction = to - from;
+            // Вычисляем длину вектора вручную
+            var length = Math.Sqrt(direction.X * direction.X + direction.Y * direction.Y);
+            if (length < 1) return; // слишком короткое ребро
+
+            var dir = new Point(direction.X / length, direction.Y / length);
+            double nodeRadius = 20; // половина ширины/высоты эллипса (у вас 40x40)
+            var tip = to - dir * nodeRadius;
+            var base1 = tip - dir * arrowSize + new Point(-dir.Y, dir.X) * (arrowSize * 0.4);
+            var base2 = tip - dir * arrowSize - new Point(-dir.Y, dir.X) * (arrowSize * 0.4);
+
+            // Создаём коллекцию точек (надёжный способ)
+            var points = new Avalonia.Points();
+            points.Add(tip);
+            points.Add(base1);
+            points.Add(base2);
+
+            var polygon = new Avalonia.Controls.Shapes.Polygon
+            {
+                Points = points,
+                Fill = brush,
+                Stroke = brush,
+                StrokeThickness = 1
+            };
+            canvas.Children.Add(polygon);
+        }
+
     }
 }

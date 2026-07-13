@@ -1,7 +1,5 @@
 ﻿using Client.Models.Dtos;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using CommunityToolkit.Mvvm.ComponentModel;
 using System.Text.Json.Serialization;
 
 namespace Client.Dtos
@@ -10,7 +8,7 @@ namespace Client.Dtos
     /// Data Transfer Object (DTO) для представления узла графа.
     /// Используется для передачи данных о вершине и её типе.
     /// </summary>
-    public class NodeDto
+    public partial class NodeDto : ObservableObject
     {
         // Уникальный идентификатор узла.
         public int Id { get; set; }
@@ -25,8 +23,10 @@ namespace Client.Dtos
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public NodeType Type { get; set; }
 
-        // НОВОЕ: Статус узла (OK, NOT OK, NOT STATED) - вычисляемое поле
-        public string Status { get; set; } = "❓ NOT STATED";
+        // НОВОЕ: Статус узла (OK, NOT OK, NOT STATED) - вычисляемое поле.
+        // Теперь это ObservableProperty, чтобы изменения автоматически уведомляли UI.
+        [ObservableProperty]
+        private string _status = "❓ NOT STATED";
 
         /// <summary>
         /// Возвращает строковое представление узла в формате: "Имя (Значение) - Тип".

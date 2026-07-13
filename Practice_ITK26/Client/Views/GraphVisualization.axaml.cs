@@ -24,6 +24,10 @@ namespace Client.Views
         private readonly Pen _edgePen = new(Brushes.Gray, 2);
         private readonly Pen _selectedNodePen = new(Brushes.Red, 3);
 
+        private readonly SolidColorBrush _okBrush = new(Colors.LightGreen);
+        private readonly SolidColorBrush _notOkBrush = new(Colors.LightCoral);
+        private readonly SolidColorBrush _notStatedBrush = new(Colors.LightGray);
+
         private const double NodeRadius = 20;      // половина ширины эллипса (у вас 40x40)
         private const double MinDistance = 50;     // минимальное расстояние между центрами
 
@@ -97,10 +101,14 @@ namespace Client.Views
         {
             if (Nodes == null || Nodes.Count == 0) return;
 
-            double centerX = GraphCanvas.Bounds.Width / 2;
-            double centerY = GraphCanvas.Bounds.Height / 2;
+            // Если холст ещё не отрисован, используем разумные значения по умолчанию
+            double width = GraphCanvas.Bounds.Width > 0 ? GraphCanvas.Bounds.Width : 800;
+            double height = GraphCanvas.Bounds.Height > 0 ? GraphCanvas.Bounds.Height : 600;
+
+            double centerX = width / 2;
+            double centerY = height / 2;
             double radius = Math.Min(centerX, centerY) * 0.8;
-            if (radius < 50) radius = 50; // минимальный радиус
+            if (radius < 50) radius = 50;
 
             int count = Nodes.Count;
             for (int i = 0; i < count; i++)
@@ -120,11 +128,23 @@ namespace Client.Views
             if (change.Property == NodesProperty)
             {
                 if (change.OldValue is ObservableCollection<NodeDto> oldNodes)
+                {
                     oldNodes.CollectionChanged -= OnNodesCollectionChanged;
+                    // Отписываемся от всех старых узлов
+                    foreach (var node in oldNodes)
+                    {
+                        node.PropertyChanged -= OnNodePropertyChanged;
+                    }
+                }
 
                 if (change.NewValue is ObservableCollection<NodeDto> newNodes)
                 {
                     newNodes.CollectionChanged += OnNodesCollectionChanged;
+                    // Подписываемся на все существующие узлы
+                    foreach (var node in newNodes)
+                    {
+                        node.PropertyChanged += OnNodePropertyChanged;
+                    }
                     OnNodesCollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
                 }
             }
@@ -146,6 +166,24 @@ namespace Client.Views
         {
             if (Nodes != null)
             {
+                // Обработка удаления: отписываемся от узлов, которые были удалены
+                if (e.OldItems != null)
+                {
+                    foreach (NodeDto node in e.OldItems)
+                    {
+                        node.PropertyChanged -= OnNodePropertyChanged;
+                    }
+                }
+
+                // Обработка добавления: подписываемся на новые узлы
+                if (e.NewItems != null)
+                {
+                    foreach (NodeDto node in e.NewItems)
+                    {
+                        node.PropertyChanged += OnNodePropertyChanged;
+                    }
+                }
+
                 // Удаляем позиции для узлов, которых больше нет
                 var toRemove = _nodePositions.Keys.Where(id => !Nodes.Any(n => n.Id == id)).ToList();
                 foreach (var id in toRemove)
@@ -158,14 +196,10 @@ namespace Client.Views
                     // Если новых узлов больше 5 – перестраиваем все узлы по кругу
                     if (newNodes.Count > 5)
                     {
-                        // Сохраняем текущие позиции только для существующих узлов (если они есть)
-                        // и добавляем новые, но проще сразу разложить всё по кругу.
-                        // При этом все старые узлы тоже переедут – это нормально при массовом добавлении.
                         LayoutCircle();
                     }
                     else
                     {
-                        // Иначе используем поиск свободного места (как раньше)
                         var occupied = new List<Point>(_nodePositions.Values);
                         foreach (var node in newNodes)
                         {
@@ -231,11 +265,21 @@ namespace Client.Views
             {
                 if (_nodePositions.TryGetValue(node.Id, out var pos))
                 {
+                    // Определяем цвет заливки в зависимости от статуса
+                    SolidColorBrush fillBrush;
+                    if (node.Status?.Contains("NOT OK") == true)
+                        fillBrush = _notOkBrush;
+                    else if (node.Status?.Contains("OK") == true)
+                        fillBrush = _okBrush;
+                    else
+                        fillBrush = _notStatedBrush;
+
+                    // Эллипс (круг) узла
                     var ellipse = new Avalonia.Controls.Shapes.Ellipse
                     {
                         Width = 40,
                         Height = 40,
-                        Fill = _nodeBrush,
+                        Fill = fillBrush,
                         Stroke = _nodeBorderBrush,
                         StrokeThickness = 2,
                         Tag = node.Id
@@ -244,18 +288,41 @@ namespace Client.Views
                     Canvas.SetTop(ellipse, pos.Y - 20);
                     canvas.Children.Add(ellipse);
 
+                    // Формируем текст: "Имя - Статус" (статус без эмодзи)
+                    string statusText = node.Status ?? "";
+                    string shortStatus;
+                    if (statusText.Contains("NOT OK"))
+                        shortStatus = "NOT OK";
+                    else if (statusText.Contains("OK"))
+                        shortStatus = "OK";
+                    else
+                        shortStatus = "NOT STATED";
+                    string displayText = $"{node.Name} - {shortStatus}";
+
+                    // Текст под узлом
                     var text = new TextBlock
                     {
-                        Text = node.Id.ToString(),
-                        FontSize = 12,
+                        Text = displayText,
+                        FontSize = 10,
                         Foreground = Brushes.Black,
                         HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
                         VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
                     };
-                    Canvas.SetLeft(text, pos.X - 10);
-                    Canvas.SetTop(text, pos.Y - 8);
+                    // Располагаем под эллипсом (чуть ниже и с центрированием)
+                    Canvas.SetLeft(text, pos.X - 30);   // примерное центрирование (60px ширина)
+                    Canvas.SetTop(text, pos.Y + 22);    // сразу под кругом
                     canvas.Children.Add(text);
                 }
+            }
+        }
+
+
+        private void OnNodePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            // Если изменилось свойство Status – перерисовываем
+            if (e.PropertyName == nameof(NodeDto.Status))
+            {
+                Redraw();
             }
         }
 

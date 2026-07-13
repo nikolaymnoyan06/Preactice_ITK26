@@ -24,6 +24,9 @@ namespace Client.Views
         private readonly Pen _edgePen = new(Brushes.Gray, 2);
         private readonly Pen _selectedNodePen = new(Brushes.Red, 3);
 
+        private const double NodeRadius = 20;      // половина ширины эллипса (у вас 40x40)
+        private const double MinDistance = 50;     // минимальное расстояние между центрами
+
         public GraphVisualization()
         {
             InitializeComponent();
@@ -48,6 +51,66 @@ namespace Client.Views
         {
             get => GetValue(EdgesProperty);
             set => SetValue(EdgesProperty, value);
+        }
+
+        /// <summary>
+        /// Пытается найти случайную позицию, которая не пересекается с уже занятыми.
+        /// </summary>
+        private Point FindFreePosition(List<Point> occupiedPositions, int maxAttempts = 100)
+        {
+            var width = Math.Max(GraphCanvas.Bounds.Width, 200);
+            var height = Math.Max(GraphCanvas.Bounds.Height, 200);
+            var margin = 50;
+
+            for (int attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                var candidate = new Point(
+                    Random.Shared.Next(margin, (int)width - margin),
+                    Random.Shared.Next(margin, (int)height - margin)
+                );
+
+                bool isFree = true;
+                foreach (var pos in occupiedPositions)
+                {
+                    var dx = candidate.X - pos.X;
+                    var dy = candidate.Y - pos.Y;
+                    var distance = Math.Sqrt(dx * dx + dy * dy);
+                    if (distance < MinDistance)
+                    {
+                        isFree = false;
+                        break;
+                    }
+                }
+                if (isFree)
+                    return candidate;
+            }
+
+            // Если не нашли – возвращаем центр с небольшим смещением
+            return new Point(width / 2 + Random.Shared.Next(-30, 30), height / 2 + Random.Shared.Next(-30, 30));
+        }
+
+
+        /// <summary>
+        /// Располагает все узлы равномерно по окружности.
+        /// </summary>
+        private void LayoutCircle()
+        {
+            if (Nodes == null || Nodes.Count == 0) return;
+
+            double centerX = GraphCanvas.Bounds.Width / 2;
+            double centerY = GraphCanvas.Bounds.Height / 2;
+            double radius = Math.Min(centerX, centerY) * 0.8;
+            if (radius < 50) radius = 50; // минимальный радиус
+
+            int count = Nodes.Count;
+            for (int i = 0; i < count; i++)
+            {
+                double angle = 2 * Math.PI * i / count;
+                double x = centerX + radius * Math.Cos(angle);
+                double y = centerY + radius * Math.Sin(angle);
+                var node = Nodes[i];
+                _nodePositions[node.Id] = new Point(x, y);
+            }
         }
 
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -83,20 +146,35 @@ namespace Client.Views
         {
             if (Nodes != null)
             {
-                foreach (var node in Nodes)
-                {
-                    if (!_nodePositions.ContainsKey(node.Id))
-                    {
-                        _nodePositions[node.Id] = new Point(
-                            Random.Shared.Next(50, (int)Math.Max(GraphCanvas.Bounds.Width, 100) - 50),
-                            Random.Shared.Next(50, (int)Math.Max(GraphCanvas.Bounds.Height, 100) - 50)
-                        );
-                    }
-                }
-
+                // Удаляем позиции для узлов, которых больше нет
                 var toRemove = _nodePositions.Keys.Where(id => !Nodes.Any(n => n.Id == id)).ToList();
                 foreach (var id in toRemove)
                     _nodePositions.Remove(id);
+
+                // Собираем узлы, у которых ещё нет позиции (новые)
+                var newNodes = Nodes.Where(n => !_nodePositions.ContainsKey(n.Id)).ToList();
+                if (newNodes.Any())
+                {
+                    // Если новых узлов больше 5 – перестраиваем все узлы по кругу
+                    if (newNodes.Count > 5)
+                    {
+                        // Сохраняем текущие позиции только для существующих узлов (если они есть)
+                        // и добавляем новые, но проще сразу разложить всё по кругу.
+                        // При этом все старые узлы тоже переедут – это нормально при массовом добавлении.
+                        LayoutCircle();
+                    }
+                    else
+                    {
+                        // Иначе используем поиск свободного места (как раньше)
+                        var occupied = new List<Point>(_nodePositions.Values);
+                        foreach (var node in newNodes)
+                        {
+                            var newPos = FindFreePosition(occupied);
+                            _nodePositions[node.Id] = newPos;
+                            occupied.Add(newPos);
+                        }
+                    }
+                }
             }
 
             Redraw();

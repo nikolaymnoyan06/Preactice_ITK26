@@ -85,6 +85,24 @@ namespace Client.ViewModels
             set => SetProperty(ref _selectedNodeType, value);
         }
 
+        // ========== ПОЛЯ ДЛЯ СРАВНЕНИЯ ==========
+
+        private string _compareThreshold = "50";
+        /// <summary>
+        /// Сравниваемое число для статуса узлов.
+        /// </summary>
+        public string CompareThreshold
+        {
+            get => _compareThreshold;
+            set
+            {
+                if (SetProperty(ref _compareThreshold, value))
+                {
+                    UpdateNodeStatuses(); // Автоматически обновляем статусы при изменении числа
+                }
+            }
+        }
+
         // ========== РЁБРА ==========
         private ObservableCollection<EdgeDto> _edges = new ObservableCollection<EdgeDto>();
         public ObservableCollection<EdgeDto> Edges
@@ -167,6 +185,10 @@ namespace Client.ViewModels
         public IRelayCommand AddEdgeCommand { get; }
         public IRelayCommand DeleteEdgeCommand { get; }
         public IRelayCommand GenerateNodesCommand { get; }
+        /// <summary>
+        /// Команда обновления статусов узлов.
+        /// </summary>
+        public IRelayCommand UpdateStatusesCommand { get; }
 
         // Базовый адрес сервиса
         private readonly string _baseUrl = "http://localhost:5000";
@@ -186,6 +208,9 @@ namespace Client.ViewModels
             LoadEdgesCommand = new RelayCommand(async () => await LoadEdgesAsync());
             AddEdgeCommand = new RelayCommand(async () => await AddEdgeAsync(), () => CanAddEdge());
             DeleteEdgeCommand = new RelayCommand(async () => await DeleteEdgeAsync(), () => SelectedEdge != null);
+
+            // Команда обновления статусов
+            UpdateStatusesCommand = new RelayCommand(UpdateNodeStatuses);
 
             // При запуске сразу загружаем узлы и рёбра
             LoadNodesCommand.Execute(null);
@@ -207,6 +232,9 @@ namespace Client.ViewModels
                         Nodes.Add(node);
                     }
                     Greeting = $"Узлов: {Nodes.Count}";
+
+                    // Обновляем статусы после загрузки
+                    UpdateNodeStatuses();
                 }
                 else
                 {
@@ -265,6 +293,9 @@ namespace Client.ViewModels
                     NewNodeName = "";
                     NewNodeValue = "0";
                     Greeting = "Узел добавлен";
+
+                    // Обновляем статусы
+                    UpdateNodeStatuses();
                 }
                 else
                 {
@@ -290,6 +321,9 @@ namespace Client.ViewModels
                 {
                     await LoadNodesAsync();
                     SelectedNode = null;
+
+                    // Обновляем статусы
+                    UpdateNodeStatuses();
                 }
                 else
                 {
@@ -451,6 +485,9 @@ namespace Client.ViewModels
                 {
                     Greeting = $"Сгенерировано {count} узлов";
                     await LoadNodesAsync();
+
+                    // Обновляем статусы
+                    UpdateNodeStatuses();
                 }
                 else
                 {
@@ -469,5 +506,51 @@ namespace Client.ViewModels
             var result = !string.IsNullOrWhiteSpace(NewNodeId) && int.TryParse(NewNodeId, out _);
             return result;
         }
+
+        #region Методы для сравнения значений узлов
+
+        /// <summary>
+        /// Обновляет статусы всех узлов на основе сравниваемого числа.
+        /// Статус отображается в колонке "Статус" таблицы узлов.
+        /// </summary>
+        private void UpdateNodeStatuses()
+        {
+            // Проверяем, что сравниваемое число — число
+            if (!double.TryParse(CompareThreshold, out double threshold))
+            {
+                // Если не число, показываем "Ошибка" для всех узлов
+                foreach (var node in Nodes)
+                {
+                    node.Status = "❌ Ошибка";
+                }
+                return;
+            }
+
+            // Если узлов нет, выходим
+            if (Nodes.Count == 0)
+            {
+                return;
+            }
+
+            // Обновляем статус для каждого узла
+            foreach (var node in Nodes)
+            {
+                // Проверяем значение узла
+                if (double.IsNaN(node.Value))
+                {
+                    node.Status = "❓ NOT STATED";
+                }
+                else if (node.Value >= threshold)
+                {
+                    node.Status = "✅ OK";
+                }
+                else
+                {
+                    node.Status = "❌ NOT OK";
+                }
+            }
+        }
+
+        #endregion
     }
 }

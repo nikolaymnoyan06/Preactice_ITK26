@@ -25,6 +25,9 @@ namespace Client.Dtos
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public NodeType Type { get; set; }
 
+        // НОВОЕ: Статус узла (OK, NOT OK, NOT STATED) - вычисляемое поле
+        public string Status { get; set; } = "❓ NOT STATED";
+
         /// <summary>
         /// Возвращает строковое представление узла в формате: "Имя (Значение) - Тип".
         /// </summary>

@@ -13,15 +13,31 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
+// Добавляем CORS для клиента
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll",
+        policy =>
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        });
+});
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+// Используем CORS
+app.UseCors("AllowAll");
 
 // ХРАНИЛИЩЕ В ПАМЯТИ
 
 /// <summary>Хранилище узлов и рёбер в оперативной памяти.</summary>
 var nodes = new List<NodeDto>();
 var edges = new List<EdgeDto>();
+var nextEdgeId = 1; // Для авто-инкремента ID рёбер
 
 // ЭНДПОИНТЫ УЗЛОВ
 
@@ -34,6 +50,10 @@ app.MapPost("/api/nodes", (NodeDto dto) =>
     if (nodes.Any(n => n.Id == dto.Id))
         return Results.BadRequest(new { error = "Узел с таким ID уже существует" });
 
+    // Если имя не указано, создаем автоматически
+    if (string.IsNullOrEmpty(dto.Name))
+        dto.Name = $"Узел {dto.Id}";
+
     nodes.Add(dto);
     return Results.Ok(new { message = "Узел добавлен", id = dto.Id });
 });
@@ -45,7 +65,7 @@ app.MapDelete("/api/nodes/{id}", (int id) =>
     if (node == null) return Results.NotFound(new { error = "Узел не найден" });
 
     nodes.Remove(node);
-    edges.RemoveAll(e => e.SourceId == id || e.TargetId == id); // Удаляем рёбра
+    edges.RemoveAll(e => e.SourceId == id || e.TargetId == id);
 
     return Results.Ok(new { message = "Узел удален", id = id });
 });
@@ -59,12 +79,15 @@ app.MapPost("/api/generate-nodes", (int count) =>
     var generator = new Generator();
     var newNodes = generator.GenerateNodes(count);
 
+    // Находим максимальный ID в существующих узлах
+    int maxId = nodes.Any() ? nodes.Max(n => n.Id) : 0;
+
     foreach (var node in newNodes)
     {
-        if (!nodes.Any(n => n.Id == node.Id)) // Если ID свободен
-        {
-            nodes.Add(node);
-        }
+        // Присваиваем уникальный ID, начиная с maxId + 1
+        maxId++;
+        node.Id = maxId;
+        nodes.Add(node);
     }
 
     return Results.Ok(new { message = $"Сгенерировано {count} узлов", totalNodes = nodes.Count });
@@ -83,7 +106,19 @@ app.MapPost("/api/edges", (EdgeDto dto) =>
     if (!nodes.Any(n => n.Id == dto.TargetId))
         return Results.BadRequest($"Узел-приёмник {dto.TargetId} не найден");
 
-    if (dto.Id == 0) dto.Id = edges.Count + 1; // Авто-ID, если не указан
+    // Авто-ID, если не указан или указан 0
+    if (dto.Id == 0)
+    {
+        dto.Id = nextEdgeId++;
+    }
+    else
+    {
+        // Проверяем, что ID не занят
+        if (edges.Any(e => e.Id == dto.Id))
+            return Results.BadRequest($"Ребро с ID {dto.Id} уже существует");
+        if (dto.Id >= nextEdgeId)
+            nextEdgeId = dto.Id + 1;
+    }
 
     edges.Add(dto);
     return Results.Ok(new { message = "Ребро добавлено", id = dto.Id });

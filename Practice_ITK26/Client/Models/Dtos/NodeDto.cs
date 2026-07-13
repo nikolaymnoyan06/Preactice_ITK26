@@ -1,4 +1,7 @@
 ﻿using Client.Models.Dtos;
+using System;
+using System.Collections.Generic;
+using System.Text;
 using System.Text.Json.Serialization;
 
 namespace Client.Dtos
@@ -12,16 +15,19 @@ namespace Client.Dtos
         // Уникальный идентификатор узла.
         public int Id { get; set; }
 
-        // Значение, хранящееся в узле (может быть любого типа).
-        public object Value { get; set; }
+        // Имя узла
+        public string Name { get; set; } = string.Empty;
+
+        // Значение, хранящееся в узле (числовое).
+        public double Value { get; set; }
 
         // Тип узла (например, начальный, конечный, промежуточный и т.п.).
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public NodeType Type { get; set; }
 
         /// <summary>
-        /// Возвращает строковое представление узла в формате: "Значение (Тип)".
+        /// Возвращает строковое представление узла в формате: "Имя (Значение) - Тип".
         /// </summary>
-        public override string ToString() => $"{Value} ({Type})";
+        public override string ToString() => $"{Name} ({Value}) - {Type}";
     }
 }

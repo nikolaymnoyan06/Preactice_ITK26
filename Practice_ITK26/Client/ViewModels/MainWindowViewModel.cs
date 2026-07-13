@@ -1,4 +1,5 @@
 ﻿using Client.Dtos;
+using Client.Models;
 using Client.Models.Dtos;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -30,7 +31,6 @@ namespace Client.ViewModels
             set => SetProperty(ref _nodes, value);
         }
 
-
         // Поля для ввода нового узла
         private string _newNodeId = "";
         public string NewNodeId
@@ -45,7 +45,14 @@ namespace Client.ViewModels
             }
         }
 
-        private string _newNodeValue = "";
+        private string _newNodeName = "";
+        public string NewNodeName
+        {
+            get => _newNodeName;
+            set => SetProperty(ref _newNodeName, value);
+        }
+
+        private string _newNodeValue = "0";
         public string NewNodeValue
         {
             get => _newNodeValue;
@@ -53,8 +60,8 @@ namespace Client.ViewModels
         }
 
         // Выбранный узел для удаления
-        private NodeDto _selectedNode;
-        public NodeDto SelectedNode
+        private NodeDto? _selectedNode;
+        public NodeDto? SelectedNode
         {
             get => _selectedNode;
             set
@@ -65,6 +72,7 @@ namespace Client.ViewModels
                 }
             }
         }
+
         // Список типов для выпадающего списка
         public ObservableCollection<NodeType> NodeTypes { get; } = new ObservableCollection<NodeType>(
             Enum.GetValues(typeof(NodeType)).Cast<NodeType>()
@@ -75,6 +83,24 @@ namespace Client.ViewModels
         {
             get => _selectedNodeType;
             set => SetProperty(ref _selectedNodeType, value);
+        }
+
+        // ========== ПОЛЯ ДЛЯ СРАВНЕНИЯ ==========
+
+        private string _compareThreshold = "50";
+        /// <summary>
+        /// Сравниваемое число для статуса узлов.
+        /// </summary>
+        public string CompareThreshold
+        {
+            get => _compareThreshold;
+            set
+            {
+                if (SetProperty(ref _compareThreshold, value))
+                {
+                    UpdateNodeStatuses(); // Автоматически обновляем статусы при изменении числа
+                }
+            }
         }
 
         // ========== РЁБРА ==========
@@ -124,8 +150,8 @@ namespace Client.ViewModels
             }
         }
 
-        private EdgeDto _selectedEdge;
-        public EdgeDto SelectedEdge
+        private EdgeDto? _selectedEdge;
+        public EdgeDto? SelectedEdge
         {
             get => _selectedEdge;
             set
@@ -136,6 +162,7 @@ namespace Client.ViewModels
                 }
             }
         }
+
         // ========== НОВОЕ: поле для количества генерируемых узлов ==========
         private string _generateCount = "10";
         public string GenerateCount
@@ -157,7 +184,11 @@ namespace Client.ViewModels
         public IRelayCommand LoadEdgesCommand { get; }
         public IRelayCommand AddEdgeCommand { get; }
         public IRelayCommand DeleteEdgeCommand { get; }
-        public IRelayCommand GenerateNodesCommand { get; } // НОВАЯ КОМАНДА
+        public IRelayCommand GenerateNodesCommand { get; }
+        /// <summary>
+        /// Команда обновления статусов узлов.
+        /// </summary>
+        public IRelayCommand UpdateStatusesCommand { get; }
 
         // Базовый адрес сервиса
         private readonly string _baseUrl = "http://localhost:5000";
@@ -170,15 +201,18 @@ namespace Client.ViewModels
             AddNodeCommand = new RelayCommand(async () => await AddNodeAsync(), () => CanAddNode());
             DeleteNodeCommand = new RelayCommand(async () => await DeleteNodeAsync(), () => SelectedNode != null);
 
-            // ========== НОВОЕ: инициализация команды генерации ==========
             GenerateNodesCommand = new RelayCommand(
                 async () => await GenerateNodesAsync(),
                 () => CanGenerate()
             );
             LoadEdgesCommand = new RelayCommand(async () => await LoadEdgesAsync());
-            AddEdgeCommand = new RelayCommand(async () => await AddEdgeAsync());
+            AddEdgeCommand = new RelayCommand(async () => await AddEdgeAsync(), () => CanAddEdge());
             DeleteEdgeCommand = new RelayCommand(async () => await DeleteEdgeAsync(), () => SelectedEdge != null);
-            // При запуске сразу загружаем узлы
+
+            // Команда обновления статусов
+            UpdateStatusesCommand = new RelayCommand(UpdateNodeStatuses);
+
+            // При запуске сразу загружаем узлы и рёбра
             LoadNodesCommand.Execute(null);
             LoadEdgesCommand.Execute(null);
         }
@@ -198,6 +232,9 @@ namespace Client.ViewModels
                         Nodes.Add(node);
                     }
                     Greeting = $"Узлов: {Nodes.Count}";
+
+                    // Обновляем статусы после загрузки
+                    UpdateNodeStatuses();
                 }
                 else
                 {
@@ -223,11 +260,23 @@ namespace Client.ViewModels
                     return;
                 }
 
-                System.Diagnostics.Debug.WriteLine($"ID: {id}, Value: {NewNodeValue}");
+                if (!double.TryParse(NewNodeValue, out double value))
+                {
+                    Greeting = "Значение должно быть числом";
+                    System.Diagnostics.Debug.WriteLine("Ошибка: Значение не число");
+                    return;
+                }
 
-                System.Diagnostics.Debug.WriteLine($"Перед отправкой: SelectedNodeType = {SelectedNodeType}");
+                System.Diagnostics.Debug.WriteLine($"ID: {id}, Name: {NewNodeName}, Value: {value}, Type: {SelectedNodeType}");
 
-                var dto = new NodeDto { Id = id, Value = NewNodeValue, Type = SelectedNodeType };
+                var dto = new NodeDto
+                {
+                    Id = id,
+                    Name = NewNodeName,
+                    Value = value,
+                    Type = SelectedNodeType
+                };
+
                 using var httpClient = new HttpClient();
 
                 System.Diagnostics.Debug.WriteLine($"Отправка POST на {_baseUrl}/api/nodes");
@@ -241,8 +290,12 @@ namespace Client.ViewModels
                 {
                     await LoadNodesAsync();
                     NewNodeId = "";
-                    NewNodeValue = "";
+                    NewNodeName = "";
+                    NewNodeValue = "0";
                     Greeting = "Узел добавлен";
+
+                    // Обновляем статусы
+                    UpdateNodeStatuses();
                 }
                 else
                 {
@@ -268,6 +321,9 @@ namespace Client.ViewModels
                 {
                     await LoadNodesAsync();
                     SelectedNode = null;
+
+                    // Обновляем статусы
+                    UpdateNodeStatuses();
                 }
                 else
                 {
@@ -313,7 +369,6 @@ namespace Client.ViewModels
                 Greeting = $"Ошибка: {ex.Message}";
             }
         }
-
 
         private async Task AddEdgeAsync()
         {
@@ -370,7 +425,6 @@ namespace Client.ViewModels
             }
         }
 
-
         private async Task DeleteEdgeAsync()
         {
             try
@@ -408,7 +462,7 @@ namespace Client.ViewModels
             return result;
         }
 
-        //МЕТОДЫ ДЛЯ ГЕНЕРАЦИИ
+        // ========== МЕТОДЫ ДЛЯ ГЕНЕРАЦИИ ==========
 
         private bool CanGenerate()
         {
@@ -430,7 +484,10 @@ namespace Client.ViewModels
                 if (response.IsSuccessStatusCode)
                 {
                     Greeting = $"Сгенерировано {count} узлов";
-                    await LoadNodesAsync(); // обновляем список
+                    await LoadNodesAsync();
+
+                    // Обновляем статусы
+                    UpdateNodeStatuses();
                 }
                 else
                 {
@@ -447,8 +504,53 @@ namespace Client.ViewModels
         private bool CanAddNode()
         {
             var result = !string.IsNullOrWhiteSpace(NewNodeId) && int.TryParse(NewNodeId, out _);
-            System.Diagnostics.Debug.WriteLine($"CanAddNode: {result} (NewNodeId='{NewNodeId}')");
             return result;
         }
+
+        #region Методы для сравнения значений узлов
+
+        /// <summary>
+        /// Обновляет статусы всех узлов на основе сравниваемого числа.
+        /// Статус отображается в колонке "Статус" таблицы узлов.
+        /// </summary>
+        private void UpdateNodeStatuses()
+        {
+            // Проверяем, что сравниваемое число — число
+            if (!double.TryParse(CompareThreshold, out double threshold))
+            {
+                // Если не число, показываем "Ошибка" для всех узлов
+                foreach (var node in Nodes)
+                {
+                    node.Status = "❌ Ошибка";
+                }
+                return;
+            }
+
+            // Если узлов нет, выходим
+            if (Nodes.Count == 0)
+            {
+                return;
+            }
+
+            // Обновляем статус для каждого узла
+            foreach (var node in Nodes)
+            {
+                // Проверяем значение узла
+                if (double.IsNaN(node.Value))
+                {
+                    node.Status = "❓ NOT STATED";
+                }
+                else if (node.Value >= threshold)
+                {
+                    node.Status = "✅ OK";
+                }
+                else
+                {
+                    node.Status = "❌ NOT OK";
+                }
+            }
+        }
+
+        #endregion
     }
 }

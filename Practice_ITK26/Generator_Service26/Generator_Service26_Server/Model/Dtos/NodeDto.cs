@@ -12,14 +12,17 @@ namespace Generator_Service26.Model.Dtos
         // Уникальный идентификатор узла.
         public int Id { get; set; }
 
-        // Произвольное значение, хранящееся в узле.
-        public object Value { get; set; }
+        // Имя узла
+        public string Name { get; set; } = string.Empty;
+
+        // Произвольное значение, хранящееся в узле (числовое).
+        public double Value { get; set; }
 
         // Тип узла (Consumer, Source, Transitive).
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public NodeType Type { get; set; }
 
         /// <summary>Строковое представление узла.</summary>
-        public override string ToString() => $"{Value} ({Type})";
+        public override string ToString() => $"{Name} ({Value}) - {Type}";
     }
 }

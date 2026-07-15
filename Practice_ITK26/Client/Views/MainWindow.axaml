@@ -22,7 +22,7 @@
                    Margin="0,0,0,10"/>
 
 		<!-- Вкладки -->
-		<TabControl DockPanel.Dock="Top" Margin="0,0,0,10">
+		<TabControl x:Name="MainTabControl" DockPanel.Dock="Top" Margin="0,0,0,10">
 
 			<!-- ========== ВКЛАДКА 1: ТАБЛИЦЫ ========== -->
 			<TabItem Header="📊 Таблицы">
@@ -203,19 +203,8 @@
 			</TabItem>
 
 			<!-- ========== ВКЛАДКА 2: ВИЗУАЛИЗАЦИЯ ========== -->
-			<TabItem Header="🖼️ Визуализация">
-				<DockPanel>
-					<!-- Шторка (панель) сверху -->
-					<Border DockPanel.Dock="Top" Background="#F0F0F0" Padding="5">
-						<ToggleButton IsChecked="{Binding ShowNodeDetails}">
-							Показать ID и тип
-						</ToggleButton>
-					</Border>
-					<views:GraphVisualization
-						Nodes="{Binding Nodes}"
-						Edges="{Binding Edges}"
-						ShowDetails="{Binding ShowNodeDetails}" />
-				</DockPanel>
+			<TabItem x:Name="VisualizationTab" Header="🖼️ Визуализация">
+				<views:GraphVisualization DataContext="{Binding GraphVisualizationViewModel}" />
 			</TabItem>
 
 		</TabControl>

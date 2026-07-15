@@ -1,9 +1,28 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="Client.Views.GraphVisualization">
-	<Grid>
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:converters="clr-namespace:Client.Converters"
+             xmlns:vm="clr-namespace:Client.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="Client.Views.GraphVisualization"
+             x:DataType="vm:GraphVisualizationViewModel">
+
+	<UserControl.Resources>
+		<converters:NodePositionConverter x:Key="NodePositionConverter" />
+	</UserControl.Resources>
+
+	<DockPanel>
+		<!-- Шторка (панель) сверху -->
+		<Border DockPanel.Dock="Top" Background="#F0F0F0" Padding="5">
+			<ToggleButton IsChecked="{Binding ShowDetails}">
+				Показать ID и тип
+			</ToggleButton>
+		</Border>
+
+		<!-- Canvas для отрисовки графа -->
 		<Canvas Name="GraphCanvas"
                 Background="WhiteSmoke"
                 ClipToBounds="True" />
-	</Grid>
+	</DockPanel>
 </UserControl>

@@ -212,6 +212,10 @@ namespace Client.ViewModels
             // Команда обновления статусов
             UpdateStatusesCommand = new RelayCommand(UpdateNodeStatuses);
 
+            // Связываем ViewModel визуализации с коллекциями
+            GraphVisualizationViewModel.Nodes = Nodes;
+            GraphVisualizationViewModel.Edges = Edges;
+
             // При запуске сразу загружаем узлы и рёбра
             LoadNodesCommand.Execute(null);
             LoadEdgesCommand.Execute(null);
@@ -558,6 +562,13 @@ namespace Client.ViewModels
         {
             get => _showNodeDetails;
             set => SetProperty(ref _showNodeDetails, value);
+        }
+
+        private GraphVisualizationViewModel _graphVisualizationViewModel = new();
+        public GraphVisualizationViewModel GraphVisualizationViewModel
+        {
+            get => _graphVisualizationViewModel;
+            set => SetProperty(ref _graphVisualizationViewModel, value);
         }
 
     }

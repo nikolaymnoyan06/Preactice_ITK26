@@ -1,20 +1,212 @@
- xmlns="https://github.com/avaloniaui"
+<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Client.ViewModels"
+        xmlns:views="using:Client.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        xmlns:dg="using:Avalonia.Controls"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
         x:Class="Client.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="Client">
+        Title="Граф - Управление и визуализация">
 
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainWindowViewModel/>
-    </Design.DataContext>
+	<Design.DataContext>
+		<vm:MainWindowViewModel/>
+	</Design.DataContext>
 
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+	<DockPanel Margin="10">
+		<!-- Заголовок -->
+		<TextBlock DockPanel.Dock="Top" Text="{Binding Greeting}"
+                   HorizontalAlignment="Center" FontSize="18" FontWeight="Bold"
+                   Margin="0,0,0,10"/>
 
+		<!-- Вкладки -->
+		<TabControl x:Name="MainTabControl" DockPanel.Dock="Top" Margin="0,0,0,10">
+
+			<!-- ========== ВКЛАДКА 1: ТАБЛИЦЫ ========== -->
+			<TabItem Header="📊 Таблицы">
+				<ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Auto">
+					<Grid RowDefinitions="Auto,Auto,*,Auto,Auto,*,Auto,Auto"
+                          Margin="0,0,0,10">
+
+						<!-- Узлы -->
+						<TextBlock Grid.Row="0" Text="📊 Узлы (Nodes)"
+                                   FontWeight="Bold" FontSize="14" Margin="0,5,0,5"/>
+
+						<dg:DataGrid Grid.Row="1"
+                                     ItemsSource="{Binding Nodes}"
+                                     SelectedItem="{Binding SelectedNode}"
+                                     AutoGenerateColumns="False"
+                                     CanUserResizeColumns="True"
+                                     CanUserReorderColumns="True"
+                                     CanUserSortColumns="True"
+                                     GridLinesVisibility="All"
+                                     BorderThickness="1"
+                                     MinHeight="150"
+                                     MaxHeight="300"
+                                     Margin="0,0,0,10">
+							<dg:DataGrid.Columns>
+								<!-- КОЛОНКА ID: ширина по содержимому, но не меньше 60 -->
+								<dg:DataGridTextColumn Header="ID"
+                                                       Binding="{Binding Id}"
+                                                       Width="Auto"
+                                                       MinWidth="60"/>
+
+								<!-- КОЛОНКА Имя: ширина по содержимому, но не меньше 150 -->
+								<dg:DataGridTextColumn Header="Имя"
+                                                       Binding="{Binding Name}"
+                                                       Width="Auto"
+                                                       MinWidth="150"/>
+
+								<!-- КОЛОНКА Значение: ширина по содержимому, но не меньше 100 -->
+								<dg:DataGridTextColumn Header="Значение"
+                                                       Binding="{Binding Value}"
+                                                       Width="Auto"
+                                                       MinWidth="100"/>
+
+								<!-- КОЛОНКА Тип: ширина по содержимому, но не меньше 100 -->
+								<dg:DataGridTextColumn Header="Тип"
+                                                       Binding="{Binding Type}"
+                                                       Width="Auto"
+                                                       MinWidth="100"/>
+
+								<!-- НОВАЯ КОЛОНКА: Статус (OK/NOT OK/NOT STATED) -->
+								<dg:DataGridTextColumn Header="Статус"
+                                                       Binding="{Binding Status}"
+                                                       Width="Auto"
+                                                       MinWidth="120"/>
+							</dg:DataGrid.Columns>
+						</dg:DataGrid>
+
+						<!-- Панель управления узлами -->
+						<StackPanel Grid.Row="2" Spacing="5" Margin="0,0,0,10">
+							<StackPanel Orientation="Horizontal" Spacing="10"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Left">
+								<TextBox Width="80" Watermark="ID" Text="{Binding NewNodeId}"/>
+								<TextBox Width="150" Watermark="Имя" Text="{Binding NewNodeName}"/>
+								<TextBox Width="120" Watermark="Значение (число)" Text="{Binding NewNodeValue}"/>
+								<ComboBox Width="120" ItemsSource="{Binding NodeTypes}" SelectedItem="{Binding SelectedNodeType}"/>
+								<Button Content="➕ Добавить узел" Command="{Binding AddNodeCommand}"/>
+							</StackPanel>
+							<StackPanel Orientation="Horizontal" Spacing="10"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Left">
+								<TextBox Width="80" Watermark="Кол-во" Text="{Binding GenerateCount}"/>
+								<Button Content="🎲 Сгенерировать" Command="{Binding GenerateNodesCommand}"/>
+								<Button Content="❌ Удалить выбранный" Command="{Binding DeleteNodeCommand}"/>
+								<Button Content="🔄 Обновить" Command="{Binding LoadNodesCommand}"/>
+							</StackPanel>
+						</StackPanel>
+
+						<!-- Рёбра -->
+						<TextBlock Grid.Row="3" Text="🔗 Рёбра (Edges)"
+                                   FontWeight="Bold" FontSize="14" Margin="0,15,0,5"/>
+
+						<dg:DataGrid Grid.Row="4"
+                                     ItemsSource="{Binding Edges}"
+                                     SelectedItem="{Binding SelectedEdge}"
+                                     AutoGenerateColumns="False"
+                                     CanUserResizeColumns="True"
+                                     CanUserReorderColumns="True"
+                                     CanUserSortColumns="True"
+                                     GridLinesVisibility="All"
+                                     BorderThickness="1"
+                                     MinHeight="100"
+                                     MaxHeight="200"
+                                     Margin="0,0,0,10">
+							<dg:DataGrid.Columns>
+								<!-- КОЛОНКА ID: ширина по содержимому -->
+								<dg:DataGridTextColumn Header="ID"
+                                                       Binding="{Binding Id}"
+                                                       Width="Auto"
+                                                       MinWidth="60"/>
+
+								<!-- КОЛОНКА Source: ширина по содержимому -->
+								<dg:DataGridTextColumn Header="Source"
+                                                       Binding="{Binding SourceId}"
+                                                       Width="Auto"
+                                                       MinWidth="80"/>
+
+								<!-- КОЛОНКА Target: ширина по содержимому -->
+								<dg:DataGridTextColumn Header="Target"
+                                                       Binding="{Binding TargetId}"
+                                                       Width="Auto"
+                                                       MinWidth="80"/>
+
+								<!-- КОЛОНКА Вес: ширина по содержимому -->
+								<dg:DataGridTextColumn Header="Вес"
+                                                       Binding="{Binding Weight}"
+                                                       Width="Auto"
+                                                       MinWidth="80"/>
+							</dg:DataGrid.Columns>
+						</dg:DataGrid>
+
+						<!-- Панель управления рёбрами -->
+						<StackPanel Grid.Row="5" Spacing="5" Margin="0,5,0,0">
+							<StackPanel Orientation="Horizontal" Spacing="10"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Left">
+								<TextBox Width="80" Watermark="Source" Text="{Binding NewEdgeSource, UpdateSourceTrigger=PropertyChanged}"/>
+								<TextBox Width="80" Watermark="Target" Text="{Binding NewEdgeTarget, UpdateSourceTrigger=PropertyChanged}"/>
+								<TextBox Width="80" Watermark="Weight" Text="{Binding NewEdgeWeight, UpdateSourceTrigger=PropertyChanged}"/>
+								<Button Content="➕ Добавить ребро" Command="{Binding AddEdgeCommand}"/>
+							</StackPanel>
+							<StackPanel Orientation="Horizontal" Spacing="10"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Left">
+								<Button Content="❌ Удалить выбранное ребро" Command="{Binding DeleteEdgeCommand}"/>
+								<Button Content="🔄 Обновить рёбра" Command="{Binding LoadEdgesCommand}"/>
+							</StackPanel>
+						</StackPanel>
+
+						<!-- ========================================
+                             БЛОК СРАВНЕНИЯ
+                             ======================================== -->
+						<Border Grid.Row="6"
+                                BorderBrush="#2196F3"
+                                BorderThickness="2"
+                                CornerRadius="5"
+                                Padding="10"
+                                Margin="0,15,0,0">
+							<StackPanel Spacing="10">
+								<TextBlock Text="🔍 Сравнение значений узлов"
+                                           FontWeight="Bold"
+                                           FontSize="14"
+                                           Foreground="#2196F3"/>
+								<StackPanel Orientation="Horizontal"
+                                            Spacing="10"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Left">
+									<TextBlock Text="Сравниваемое число:"
+                                               VerticalAlignment="Center"
+                                               FontWeight="Bold"/>
+									<TextBox Width="120"
+                                             Text="{Binding CompareThreshold}"
+                                             Watermark="Введите число"/>
+									<Button Content="🔄 Обновить статусы"
+                                            Command="{Binding UpdateStatusesCommand}"
+                                            Background="#2196F3"
+                                            Foreground="White"
+                                            Padding="15,5"/>
+									<TextBlock Text="(OK: >= число, NOT OK: &lt; число, NOT STATED: нет значения)"
+                                               FontSize="11"
+                                               Foreground="Gray"/>
+								</StackPanel>
+							</StackPanel>
+						</Border>
+
+					</Grid>
+				</ScrollViewer>
+			</TabItem>
+
+			<!-- ========== ВКЛАДКА 2: ВИЗУАЛИЗАЦИЯ ========== -->
+			<TabItem x:Name="VisualizationTab" Header="🖼️ Визуализация">
+				<views:GraphVisualization DataContext="{Binding GraphVisualizationViewModel}" />
+			</TabItem>
+
+		</TabControl>
+	</DockPanel>
 </Window>

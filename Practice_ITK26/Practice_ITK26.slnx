@@ -1,8 +1,7 @@
 <Solution>
   <Folder Name="/Элементы решения/">
     <File Path=".gitignore" />
+    <Project Path="Client/Client.csproj" />
+    <Project Path="Generator_Service26/Generator_Service26_Server/Generator_Service26_Server.csproj" />
   </Folder>
-  <Project Path="Client/Client.csproj" />
-  <Project Path="Generator_Service26/Generator_Service26.AppHost/Generator_Service26.AppHost.csproj" />
-  <Project Path="Generator_Service26/Generator_Service26.Server/Generator_Service26.Server.csproj" />
 </Solution>

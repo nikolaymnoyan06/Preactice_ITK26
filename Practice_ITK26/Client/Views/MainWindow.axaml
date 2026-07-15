@@ -207,14 +207,12 @@
 				<DockPanel>
 					<!-- Шторка (панель) сверху -->
 					<Border DockPanel.Dock="Top" Background="#F0F0F0" Padding="5">
-						<ToggleButton IsChecked="{Binding ShowNodeDetails}">
+						<ToggleButton IsChecked="{Binding GraphVisualizationViewModel.ShowDetails}">
 							Показать ID и тип
 						</ToggleButton>
 					</Border>
 					<views:GraphVisualization
-						Nodes="{Binding Nodes}"
-						Edges="{Binding Edges}"
-						ShowDetails="{Binding ShowNodeDetails}" />
+						DataContext="{Binding GraphVisualizationViewModel}" />
 				</DockPanel>
 			</TabItem>
 

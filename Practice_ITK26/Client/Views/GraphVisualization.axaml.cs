@@ -3,17 +3,16 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Client.Dtos;
+using Client.ViewModels;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using System.Linq;
 
 namespace Client.Views
 {
     public partial class GraphVisualization : UserControl
     {
-        private readonly Dictionary<int, Point> _nodePositions = new();
+        private GraphVisualizationViewModel? ViewModel => DataContext as GraphVisualizationViewModel;
 
         private bool _isDragging;
         private Point _dragStartPoint;
@@ -28,208 +27,29 @@ namespace Client.Views
         private readonly SolidColorBrush _notOkBrush = new(Colors.LightCoral);
         private readonly SolidColorBrush _notStatedBrush = new(Colors.LightGray);
 
-        private const double NodeRadius = 20;      // половина ширины эллипса (у вас 40x40)
-        private const double MinDistance = 50;     // минимальное расстояние между центрами
+        private const double NodeRadius = 20;
 
         public GraphVisualization()
         {
             InitializeComponent();
+
             GraphCanvas.PointerPressed += OnCanvasPointerPressed;
             GraphCanvas.PointerMoved += OnCanvasPointerMoved;
             GraphCanvas.PointerReleased += OnCanvasPointerReleased;
         }
 
-        public static readonly StyledProperty<ObservableCollection<NodeDto>?> NodesProperty =
-            AvaloniaProperty.Register<GraphVisualization, ObservableCollection<NodeDto>?>(nameof(Nodes));
-
-        public ObservableCollection<NodeDto>? Nodes
+        protected override void OnDataContextChanged(EventArgs e)
         {
-            get => GetValue(NodesProperty);
-            set => SetValue(NodesProperty, value);
-        }
+            base.OnDataContextChanged(e);
 
-        public static readonly StyledProperty<ObservableCollection<EdgeDto>?> EdgesProperty =
-            AvaloniaProperty.Register<GraphVisualization, ObservableCollection<EdgeDto>?>(nameof(Edges));
-
-        public ObservableCollection<EdgeDto>? Edges
-        {
-            get => GetValue(EdgesProperty);
-            set => SetValue(EdgesProperty, value);
-        }
-
-        public static readonly StyledProperty<bool> ShowDetailsProperty =
-            AvaloniaProperty.Register<GraphVisualization, bool>(nameof(ShowDetails));
-
-        public bool ShowDetails
-        {
-            get => GetValue(ShowDetailsProperty);
-            set => SetValue(ShowDetailsProperty, value);
-        }
-
-        /// <summary>
-        /// Пытается найти случайную позицию, которая не пересекается с уже занятыми.
-        /// </summary>
-        private Point FindFreePosition(List<Point> occupiedPositions, int maxAttempts = 100)
-        {
-            var width = Math.Max(GraphCanvas.Bounds.Width, 200);
-            var height = Math.Max(GraphCanvas.Bounds.Height, 200);
-            var margin = 50;
-
-            for (int attempt = 0; attempt < maxAttempts; attempt++)
+            if (ViewModel != null)
             {
-                var candidate = new Point(
-                    Random.Shared.Next(margin, (int)width - margin),
-                    Random.Shared.Next(margin, (int)height - margin)
-                );
-
-                bool isFree = true;
-                foreach (var pos in occupiedPositions)
-                {
-                    var dx = candidate.X - pos.X;
-                    var dy = candidate.Y - pos.Y;
-                    var distance = Math.Sqrt(dx * dx + dy * dy);
-                    if (distance < MinDistance)
-                    {
-                        isFree = false;
-                        break;
-                    }
-                }
-                if (isFree)
-                    return candidate;
-            }
-
-            // Если не нашли – возвращаем центр с небольшим смещением
-            return new Point(width / 2 + Random.Shared.Next(-30, 30), height / 2 + Random.Shared.Next(-30, 30));
-        }
-
-
-        /// <summary>
-        /// Располагает все узлы равномерно по окружности.
-        /// </summary>
-        private void LayoutCircle()
-        {
-            if (Nodes == null || Nodes.Count == 0) return;
-
-            // Если холст ещё не отрисован, используем разумные значения по умолчанию
-            double width = GraphCanvas.Bounds.Width > 0 ? GraphCanvas.Bounds.Width : 800;
-            double height = GraphCanvas.Bounds.Height > 0 ? GraphCanvas.Bounds.Height : 600;
-
-            double centerX = width / 2;
-            double centerY = height / 2;
-            double radius = Math.Min(centerX, centerY) * 0.8;
-            if (radius < 50) radius = 50;
-
-            int count = Nodes.Count;
-            for (int i = 0; i < count; i++)
-            {
-                double angle = 2 * Math.PI * i / count;
-                double x = centerX + radius * Math.Cos(angle);
-                double y = centerY + radius * Math.Sin(angle);
-                var node = Nodes[i];
-                _nodePositions[node.Id] = new Point(x, y);
-            }
-        }
-
-        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-        {
-            base.OnPropertyChanged(change);
-
-            if (change.Property == NodesProperty)
-            {
-                if (change.OldValue is ObservableCollection<NodeDto> oldNodes)
-                {
-                    oldNodes.CollectionChanged -= OnNodesCollectionChanged;
-                    // Отписываемся от всех старых узлов
-                    foreach (var node in oldNodes)
-                    {
-                        node.PropertyChanged -= OnNodePropertyChanged;
-                    }
-                }
-
-                if (change.NewValue is ObservableCollection<NodeDto> newNodes)
-                {
-                    newNodes.CollectionChanged += OnNodesCollectionChanged;
-                    // Подписываемся на все существующие узлы
-                    foreach (var node in newNodes)
-                    {
-                        node.PropertyChanged += OnNodePropertyChanged;
-                    }
-                    OnNodesCollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
-                }
-            }
-
-            if (change.Property == EdgesProperty)
-            {
-                if (change.OldValue is ObservableCollection<EdgeDto> oldEdges)
-                    oldEdges.CollectionChanged -= OnEdgesCollectionChanged;
-
-                if (change.NewValue is ObservableCollection<EdgeDto> newEdges)
-                {
-                    newEdges.CollectionChanged += OnEdgesCollectionChanged;
-                    OnEdgesCollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
-                }
-            }
-
-            if (change.Property == ShowDetailsProperty)
-            {
+                ViewModel.RedrawRequested += OnRedrawRequested;
                 Redraw();
             }
-
         }
 
-        private void OnNodesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        {
-            if (Nodes != null)
-            {
-                // Обработка удаления: отписываемся от узлов, которые были удалены
-                if (e.OldItems != null)
-                {
-                    foreach (NodeDto node in e.OldItems)
-                    {
-                        node.PropertyChanged -= OnNodePropertyChanged;
-                    }
-                }
-
-                // Обработка добавления: подписываемся на новые узлы
-                if (e.NewItems != null)
-                {
-                    foreach (NodeDto node in e.NewItems)
-                    {
-                        node.PropertyChanged += OnNodePropertyChanged;
-                    }
-                }
-
-                // Удаляем позиции для узлов, которых больше нет
-                var toRemove = _nodePositions.Keys.Where(id => !Nodes.Any(n => n.Id == id)).ToList();
-                foreach (var id in toRemove)
-                    _nodePositions.Remove(id);
-
-                // Собираем узлы, у которых ещё нет позиции (новые)
-                var newNodes = Nodes.Where(n => !_nodePositions.ContainsKey(n.Id)).ToList();
-                if (newNodes.Any())
-                {
-                    // Если новых узлов больше 5 – перестраиваем все узлы по кругу
-                    if (newNodes.Count > 5)
-                    {
-                        LayoutCircle();
-                    }
-                    else
-                    {
-                        var occupied = new List<Point>(_nodePositions.Values);
-                        foreach (var node in newNodes)
-                        {
-                            var newPos = FindFreePosition(occupied);
-                            _nodePositions[node.Id] = newPos;
-                            occupied.Add(newPos);
-                        }
-                    }
-                }
-            }
-
-            Redraw();
-        }
-
-        private void OnEdgesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        private void OnRedrawRequested(object? sender, EventArgs e)
         {
             Redraw();
         }
@@ -239,30 +59,34 @@ namespace Client.Views
             var canvas = GraphCanvas;
             canvas.Children.Clear();
 
-            if (Nodes == null || Edges == null) return;
+            if (ViewModel?.Nodes == null || ViewModel?.Edges == null) return;
 
             // Рёбра
-            foreach (var edge in Edges)
+            foreach (var edge in ViewModel.Edges)
             {
-                if (_nodePositions.TryGetValue(edge.SourceId, out var sourcePos) &&
-                    _nodePositions.TryGetValue(edge.TargetId, out var targetPos))
+                var sourcePos = ViewModel.GetNodePosition(edge.SourceId);
+                var targetPos = ViewModel.GetNodePosition(edge.TargetId);
+
+                if (sourcePos != null && targetPos != null)
                 {
+                    var sourcePoint = new Point(sourcePos.X, sourcePos.Y);
+                    var targetPoint = new Point(targetPos.X, targetPos.Y);
+
                     var line = new Avalonia.Controls.Shapes.Line
                     {
-                        StartPoint = sourcePos,
-                        EndPoint = targetPos,
+                        StartPoint = sourcePoint,
+                        EndPoint = targetPoint,
                         Stroke = _edgePen.Brush,
                         StrokeThickness = _edgePen.Thickness,
                     };
                     canvas.Children.Add(line);
 
-                    // Рисуем стрелку на конце (у target)
-                    DrawArrow(canvas, sourcePos, targetPos, _edgePen.Brush);
+                    DrawArrow(canvas, sourcePoint, targetPoint, _edgePen.Brush);
 
-                    // Подпись веса (теперь просто edge.Weight, без .Value)
+                    // Вес ребра
                     var weightText = edge.Weight.ToString("0.0");
-                    var midX = (sourcePos.X + targetPos.X) / 2;
-                    var midY = (sourcePos.Y + targetPos.Y) / 2;
+                    var midX = (sourcePoint.X + targetPoint.X) / 2;
+                    var midY = (sourcePoint.Y + targetPoint.Y) / 2;
                     var text = new TextBlock
                     {
                         Text = weightText,
@@ -276,104 +100,93 @@ namespace Client.Views
             }
 
             // Узлы
-            foreach (var node in Nodes)
+            foreach (var nodePos in ViewModel.NodePositions)
             {
-                if (_nodePositions.TryGetValue(node.Id, out var pos))
+                var node = nodePos.Node;
+                if (node == null) continue;
+
+                var pos = new Point(nodePos.X, nodePos.Y);
+
+                // Цвет заливки в зависимости от статуса
+                SolidColorBrush fillBrush;
+                if (node.Status?.Contains("NOT OK") == true)
+                    fillBrush = _notOkBrush;
+                else if (node.Status?.Contains("OK") == true)
+                    fillBrush = _okBrush;
+                else
+                    fillBrush = _notStatedBrush;
+
+                // Эллипс (круг) узла
+                var ellipse = new Avalonia.Controls.Shapes.Ellipse
                 {
-                    // Определяем цвет заливки в зависимости от статуса
-                    SolidColorBrush fillBrush;
-                    if (node.Status?.Contains("NOT OK") == true)
-                        fillBrush = _notOkBrush;
-                    else if (node.Status?.Contains("OK") == true)
-                        fillBrush = _okBrush;
-                    else
-                        fillBrush = _notStatedBrush;
+                    Width = 40,
+                    Height = 40,
+                    Fill = fillBrush,
+                    Stroke = _nodeBorderBrush,
+                    StrokeThickness = 2,
+                    Tag = node.Id
+                };
+                Canvas.SetLeft(ellipse, pos.X - 20);
+                Canvas.SetTop(ellipse, pos.Y - 20);
+                canvas.Children.Add(ellipse);
 
-                    // Эллипс (круг) узла
-                    var ellipse = new Avalonia.Controls.Shapes.Ellipse
+                // Текст: Имя - Статус
+                string statusText = node.Status ?? "";
+                string shortStatus;
+                if (statusText.Contains("NOT OK"))
+                    shortStatus = "NOT OK";
+                else if (statusText.Contains("OK"))
+                    shortStatus = "OK";
+                else
+                    shortStatus = "NOT STATED";
+                string displayText = $"{node.Name} - {shortStatus}";
+
+                var text = new TextBlock
+                {
+                    Text = displayText,
+                    FontSize = 10,
+                    Foreground = Brushes.Black,
+                };
+                Canvas.SetLeft(text, pos.X - 30);
+                Canvas.SetTop(text, pos.Y + 22);
+                canvas.Children.Add(text);
+
+                // Детали над узлом
+                if (ViewModel.ShowDetails)
+                {
+                    string typeAbbr = node.Type.ToString().ToUpper();
+                    if (typeAbbr == "CONSUMER") typeAbbr = "CONS";
+                    else if (typeAbbr == "SOURCE") typeAbbr = "SOUR";
+                    else if (typeAbbr == "TRANSITIVE") typeAbbr = "TRANS";
+
+                    var details = new TextBlock
                     {
-                        Width = 40,
-                        Height = 40,
-                        Fill = fillBrush,
-                        Stroke = _nodeBorderBrush,
-                        StrokeThickness = 2,
-                        Tag = node.Id
+                        Text = $"ID{node.Id} - {typeAbbr}",
+                        FontSize = 9,
+                        Foreground = Brushes.DarkBlue,
+                        FontWeight = FontWeight.Bold,
+                        Background = new SolidColorBrush(Colors.WhiteSmoke)
                     };
-                    Canvas.SetLeft(ellipse, pos.X - 20);
-                    Canvas.SetTop(ellipse, pos.Y - 20);
-                    canvas.Children.Add(ellipse);
-
-                    // Формируем текст: "Имя - Статус" (статус без эмодзи)
-                    string statusText = node.Status ?? "";
-                    string shortStatus;
-                    if (statusText.Contains("NOT OK"))
-                        shortStatus = "NOT OK";
-                    else if (statusText.Contains("OK"))
-                        shortStatus = "OK";
-                    else
-                        shortStatus = "NOT STATED";
-                    string displayText = $"{node.Name} - {shortStatus}";
-
-                    // Текст под узлом
-                    var text = new TextBlock
-                    {
-                        Text = displayText,
-                        FontSize = 10,
-                        Foreground = Brushes.Black,
-                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                        VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
-                    };
-
-                    // ===== НАД узлом: ID и тип =====
-                    if (ShowDetails)
-                    {
-                        string typeAbbr = node.Type.ToString().ToUpper();
-                        if (typeAbbr == "CONSUMER") typeAbbr = "CONS";
-                        else if (typeAbbr == "SOURCE") typeAbbr = "SOUR";
-                        else if (typeAbbr == "TRANSITIVE") typeAbbr = "TRANS";
-
-                        var details = new TextBlock
-                        {
-                            Text = $"ID{node.Id} - {typeAbbr}",
-                            FontSize = 9,
-                            Foreground = Brushes.DarkBlue,
-                            FontWeight = Avalonia.Media.FontWeight.Bold,
-                            Background = new SolidColorBrush(Colors.WhiteSmoke)
-                        };
-                        Canvas.SetLeft(details, pos.X - 25);
-                        Canvas.SetTop(details, pos.Y - 40);
-                        canvas.Children.Add(details);
-                    }
-
-                    // Располагаем под эллипсом (чуть ниже и с центрированием)
-                    Canvas.SetLeft(text, pos.X - 30);   // примерное центрирование (60px ширина)
-                    Canvas.SetTop(text, pos.Y + 22);    // сразу под кругом
-                    canvas.Children.Add(text);
+                    Canvas.SetLeft(details, pos.X - 25);
+                    Canvas.SetTop(details, pos.Y - 40);
+                    canvas.Children.Add(details);
                 }
-            }
-        }
-
-
-        private void OnNodePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            // Если изменилось свойство Status – перерисовываем
-            if (e.PropertyName == nameof(NodeDto.Status))
-            {
-                Redraw();
             }
         }
 
         // ========== Перетаскивание ==========
         private void OnCanvasPointerPressed(object? sender, PointerPressedEventArgs e)
         {
+            if (ViewModel == null) return;
+
             var point = e.GetPosition(GraphCanvas);
-            foreach (var kvp in _nodePositions)
+            foreach (var nodePos in ViewModel.NodePositions)
             {
-                var pos = kvp.Value;
+                var pos = new Point(nodePos.X, nodePos.Y);
                 if (Math.Abs(point.X - pos.X) < 20 && Math.Abs(point.Y - pos.Y) < 20)
                 {
                     _isDragging = true;
-                    _draggedNodeId = kvp.Key;
+                    _draggedNodeId = nodePos.NodeId;
                     _dragStartPoint = point;
                     break;
                 }
@@ -382,15 +195,37 @@ namespace Client.Views
 
         private void OnCanvasPointerMoved(object? sender, PointerEventArgs e)
         {
-            if (_isDragging && _draggedNodeId.HasValue)
+            if (_isDragging && _draggedNodeId.HasValue && ViewModel != null)
             {
                 var currentPoint = e.GetPosition(GraphCanvas);
                 var delta = currentPoint - _dragStartPoint;
-                if (_nodePositions.ContainsKey(_draggedNodeId.Value))
+
+                var pos = ViewModel.GetNodePosition(_draggedNodeId.Value);
+                if (pos != null)
                 {
-                    var oldPos = _nodePositions[_draggedNodeId.Value];
-                    var newPos = new Point(oldPos.X + delta.X, oldPos.Y + delta.Y);
-                    _nodePositions[_draggedNodeId.Value] = newPos;
+                    // Новая позиция без ограничений
+                    var newX = pos.X + delta.X;
+                    var newY = pos.Y + delta.Y;
+
+                    // ============================================================
+                    //     ОГРАНИЧЕНИЕ ПЕРЕМЕЩЕНИЯ В ПРЕДЕЛАХ CANVAS 
+                    // Бездарный ты кусок мяса хоть бы строчку сам написал
+                    // ============================================================
+                    // Получаем размеры Canvas
+                    double canvasWidth = GraphCanvas.Bounds.Width;
+                    double canvasHeight = GraphCanvas.Bounds.Height;
+
+                    // Радиус узла (половина ширины/высоты = 20)
+                    const double nodeRadius = 20;
+
+                    // Ограничиваем X (не меньше 0 + радиус, не больше ширины - радиус)
+                    newX = Math.Max(nodeRadius, Math.Min(canvasWidth - nodeRadius, newX));
+
+                    // Ограничиваем Y (не меньше 0 + радиус, не больше высоты - радиус)
+                    newY = Math.Max(nodeRadius, Math.Min(canvasHeight - nodeRadius, newY));
+                    // ============================================================
+
+                    ViewModel.UpdateNodePosition(_draggedNodeId.Value, newX, newY);
                     _dragStartPoint = currentPoint;
                     Redraw();
                 }
@@ -403,20 +238,18 @@ namespace Client.Views
             _draggedNodeId = null;
         }
 
+        // ========== Вспомогательные методы ==========
         private void DrawArrow(Canvas canvas, Point from, Point to, IBrush brush, double arrowSize = 12)
         {
             var direction = to - from;
-            // Вычисляем длину вектора вручную
             var length = Math.Sqrt(direction.X * direction.X + direction.Y * direction.Y);
-            if (length < 1) return; // слишком короткое ребро
+            if (length < 1) return;
 
             var dir = new Point(direction.X / length, direction.Y / length);
-            double nodeRadius = 20; // половина ширины/высоты эллипса (у вас 40x40)
-            var tip = to - dir * nodeRadius;
+            var tip = to - dir * NodeRadius;
             var base1 = tip - dir * arrowSize + new Point(-dir.Y, dir.X) * (arrowSize * 0.4);
             var base2 = tip - dir * arrowSize - new Point(-dir.Y, dir.X) * (arrowSize * 0.4);
 
-            // Создаём коллекцию точек (надёжный способ)
             var points = new Avalonia.Points();
             points.Add(tip);
             points.Add(base1);
@@ -431,6 +264,5 @@ namespace Client.Views
             };
             canvas.Children.Add(polygon);
         }
-
     }
 }

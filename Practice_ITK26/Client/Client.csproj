@@ -25,6 +25,8 @@
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="ReactiveUI.Avalonia" Version="11.3.8" />
+    <PackageReference Include="RpcToolkit" Version="1.1.5" />
+    <PackageReference Include="RpcToolkit.AspNetCore" Version="1.1.5" />
     <PackageReference Include="System.Net.Http.Json" Version="10.0.9" />
   </ItemGroup>
 </Project>

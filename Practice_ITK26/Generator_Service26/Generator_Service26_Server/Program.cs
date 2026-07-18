@@ -1,110 +1,101 @@
 using Generator_Service26.Model.Dtos;
 using Generator_Service26_Server.Model;
 using Generator_Service26_Server.Model.Dtos;
+using System.Text.Json;
 using System.Text.Json.Serialization;
+
+// Настройки JSON для десериализации параметров (camelCase + enum в строки)
+var jsonOptions = new JsonSerializerOptions
+{
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    Converters = { new JsonStringEnumConverter() }
+};
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Принудительно слушаем порт 5000 
 builder.WebHost.UseUrls("http://localhost:5000");
 
-/// <summary>Настройка JSON: Enum -> строки.</summary>
+// Настройка JSON: enum → строки 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
-// Добавляем CORS для клиента
+// CORS – разрешаем все запросы с клиента 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll",
-        policy =>
-        {
-            policy.AllowAnyOrigin()
-                  .AllowAnyMethod()
-                  .AllowAnyHeader();
-        });
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
 });
-
-builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Используем CORS
 app.UseCors("AllowAll");
 
-// ХРАНИЛИЩЕ В ПАМЯТИ
-
-/// <summary>Хранилище узлов и рёбер в оперативной памяти.</summary>
+// ХРАНИЛИЩЕ В ПАМЯТИ 
+// ------------------------------------------------------------------
 var nodes = new List<NodeDto>();
 var edges = new List<EdgeDto>();
-var nextEdgeId = 1; // Для авто-инкремента ID рёбер
+var nextEdgeId = 1;
 
-// ЭНДПОИНТЫ УЗЛОВ
+
+// ОБРАБОТЧИКИ ОПЕРАЦИЙ 
+// ------------------------------------------------------------------
 
 /// <summary>Получить все узлы.</summary>
-app.MapGet("/api/nodes", () => Results.Ok(nodes));
+object HandleGetNodes() => nodes;
 
 /// <summary>Добавить новый узел.</summary>
-app.MapPost("/api/nodes", (NodeDto dto) =>
+object HandleAddNode(JsonElement parameters)
 {
-    if (nodes.Any(n => n.Id == dto.Id))
-        return Results.BadRequest(new { error = "Узел с таким ID уже существует" });
+    // Из параметров извлекаем объект "node"
+    var dto = parameters.GetProperty("node").Deserialize<NodeDto>(jsonOptions)
+        ?? throw new ArgumentException("Неверный формат узла");
 
-    // Если имя не указано, создаем автоматически
+    if (nodes.Any(n => n.Id == dto.Id))
+        throw new ArgumentException($"Узел с ID {dto.Id} уже существует");
+
     if (string.IsNullOrEmpty(dto.Name))
         dto.Name = $"Узел {dto.Id}";
 
     nodes.Add(dto);
-    return Results.Ok(new { message = "Узел добавлен", id = dto.Id });
-});
+    return new { message = "Узел добавлен", id = dto.Id };
+}
 
-/// <summary>Удалить узел по ID (вместе со связанными рёбрами).</summary>
-app.MapDelete("/api/nodes/{id}", (int id) =>
+/// <summary>Удалить узел по ID.</summary>
+object HandleDeleteNode(JsonElement parameters)
 {
+    int id = parameters.GetProperty("id").GetInt32();
+
     var node = nodes.FirstOrDefault(n => n.Id == id);
-    if (node == null) return Results.NotFound(new { error = "Узел не найден" });
+    if (node == null)
+        throw new KeyNotFoundException($"Узел с ID {id} не найден");
 
     nodes.Remove(node);
+    // Удаляем все рёбра, связанные с этим узлом
     edges.RemoveAll(e => e.SourceId == id || e.TargetId == id);
 
-    return Results.Ok(new { message = "Узел удален", id = id });
-});
-
-/// <summary>Сгенерировать узлы через Generator.</summary>
-app.MapPost("/api/generate-nodes", (int count) =>
-{
-    if (count <= 0 || count > 100)
-        return Results.BadRequest("Количество должно быть от 1 до 100");
-
-    var generator = new Generator();
-    var newNodes = generator.GenerateNodes(count);
-
-    // Находим максимальный ID в существующих узлах
-    int maxId = nodes.Any() ? nodes.Max(n => n.Id) : 0;
-
-    foreach (var node in newNodes)
-    {
-        // Присваиваем уникальный ID, начиная с maxId + 1
-        maxId++;
-        node.Id = maxId;
-        nodes.Add(node);
-    }
-
-    return Results.Ok(new { message = $"Сгенерировано {count} узлов", totalNodes = nodes.Count });
-});
-
-// ЭНДПОИНТЫ РЁБЕР
+    return new { message = "Узел удалён", id };
+}
 
 /// <summary>Получить все рёбра.</summary>
-app.MapGet("/api/edges", () => Results.Ok(edges));
+object HandleGetEdges() => edges;
 
-/// <summary>Добавить ребро между узлами.</summary>
-app.MapPost("/api/edges", (EdgeDto dto) =>
+/// <summary>Добавить ребро.</summary>
+object HandleAddEdge(JsonElement parameters)
 {
+    var dto = parameters.GetProperty("edge").Deserialize<EdgeDto>(jsonOptions)
+        ?? throw new ArgumentException("Неверный формат ребра");
+
     if (!nodes.Any(n => n.Id == dto.SourceId))
-        return Results.BadRequest($"Узел-источник {dto.SourceId} не найден");
+        throw new ArgumentException($"Узел-источник {dto.SourceId} не найден");
     if (!nodes.Any(n => n.Id == dto.TargetId))
-        return Results.BadRequest($"Узел-приёмник {dto.TargetId} не найден");
+        throw new ArgumentException($"Узел-приёмник {dto.TargetId} не найден");
 
     // Авто-ID, если не указан или указан 0
     if (dto.Id == 0)
@@ -113,32 +104,136 @@ app.MapPost("/api/edges", (EdgeDto dto) =>
     }
     else
     {
-        // Проверяем, что ID не занят
         if (edges.Any(e => e.Id == dto.Id))
-            return Results.BadRequest($"Ребро с ID {dto.Id} уже существует");
+            throw new ArgumentException($"Ребро с ID {dto.Id} уже существует");
         if (dto.Id >= nextEdgeId)
             nextEdgeId = dto.Id + 1;
     }
 
     edges.Add(dto);
-    return Results.Ok(new { message = "Ребро добавлено", id = dto.Id });
-});
-
-/// <summary>Удалить ребро по ID.</summary>
-app.MapDelete("/api/edges/{id}", (int id) =>
-{
-    var edge = edges.FirstOrDefault(e => e.Id == id);
-    if (edge == null) return Results.NotFound("Ребро не найдено");
-
-    edges.Remove(edge);
-    return Results.Ok(new { message = "Ребро удалено" });
-});
-
-// ОКРУЖЕНИЕ
-
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
+    return new { message = "Ребро добавлено", id = dto.Id };
 }
 
+/// <summary>Удалить ребро по ID.</summary>
+object HandleDeleteEdge(JsonElement parameters)
+{
+    int id = parameters.GetProperty("id").GetInt32();
+
+    var edge = edges.FirstOrDefault(e => e.Id == id);
+    if (edge == null)
+        throw new KeyNotFoundException($"Ребро с ID {id} не найдено");
+
+    edges.Remove(edge);
+    return new { message = "Ребро удалено" };
+}
+
+/// <summary>Сгенерировать узлы через Generator.</summary>
+object HandleGenerateNodes(JsonElement parameters)
+{
+    int count = parameters.GetProperty("count").GetInt32();
+
+    if (count <= 0 || count > 100)
+        throw new ArgumentException("Количество должно быть от 1 до 100");
+
+    var generator = new Generator();
+    var newNodes = generator.GenerateNodes(count);
+
+    int maxId = nodes.Any() ? nodes.Max(n => n.Id) : 0;
+    foreach (var node in newNodes)
+    {
+        maxId++;
+        node.Id = maxId;
+        nodes.Add(node);
+    }
+
+    return new { message = $"Сгенерировано {count} узлов", totalNodes = nodes.Count };
+}
+
+// ДИСПЕТЧЕР МЕТОДОВ 
+// ------------------------------------------------------------------
+object? DispatchMethod(string method, JsonElement? parameters)
+{
+    return method switch
+    {
+        "getNodes" => HandleGetNodes(),
+        "addNode" => HandleAddNode(parameters!.Value),
+        "deleteNode" => HandleDeleteNode(parameters!.Value),
+        "getEdges" => HandleGetEdges(),
+        "addEdge" => HandleAddEdge(parameters!.Value),
+        "deleteEdge" => HandleDeleteEdge(parameters!.Value),
+        "generateNodes" => HandleGenerateNodes(parameters!.Value),
+        _ => throw new InvalidOperationException($"Неизвестный метод: {method}")
+    };
+}
+
+
+// ЕДИНЫЙ JSON-RPC ЭНДПОИНТ
+// ------------------------------------------------------------------
+app.MapPost("/jsonrpc", async (HttpContext context) =>
+{
+    try
+    {
+        // 1. Читаем и парсим тело запроса
+        using var doc = await JsonDocument.ParseAsync(context.Request.Body);
+        var request = doc.RootElement;
+
+        // 2. Проверяем версию JSON-RPC
+        string? jsonrpc = request.GetProperty("jsonrpc").GetString();
+        if (jsonrpc != "2.0")
+            throw new Exception("Поддерживается только JSON-RPC 2.0");
+
+        // 3. Извлекаем id 
+        int? id = request.TryGetProperty("id", out var idProp) ? idProp.GetInt32() : null;
+
+        // 4. Имя метода
+        string method = request.GetProperty("method").GetString()!;
+
+        // 5. Параметры 
+        JsonElement? parameters = request.TryGetProperty("params", out var paramsProp) ? paramsProp : null;
+
+        // 6. Выполняем метод 
+        object? result;
+        try
+        {
+            result = DispatchMethod(method, parameters);
+        }
+        catch (Exception ex)
+        {
+            // Возвращаем ошибку JSON-RPC 
+            var errorResponse = new
+            {
+                jsonrpc = "2.0",
+                error = new { code = -32000, message = ex.Message },
+                id
+            };
+            context.Response.StatusCode = 200; // согласно спецификации, ошибка возвращается с HTTP 200
+            await context.Response.WriteAsJsonAsync(errorResponse);
+            return;
+        }
+
+        // 7. Успешный ответ
+        var response = new
+        {
+            jsonrpc = "2.0",
+            result,
+            id
+        };
+        context.Response.StatusCode = 200;
+        await context.Response.WriteAsJsonAsync(response);
+    }
+    catch (Exception ex)
+    {
+        // Если не удалось разобрать запрос 
+        var errorResponse = new
+        {
+            jsonrpc = "2.0",
+            error = new { code = -32700, message = "Parse error" },
+            id = (int?)null
+        };
+        context.Response.StatusCode = 200;
+        await context.Response.WriteAsJsonAsync(errorResponse);
+    }
+});
+
+// Запускаем сервер
 app.Run();

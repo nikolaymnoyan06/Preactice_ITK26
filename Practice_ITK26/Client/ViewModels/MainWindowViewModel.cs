@@ -1,16 +1,17 @@
 ﻿using Client.Dtos;
 using Client.Models;
 using Client.Models.Dtos;
+using Client.Models.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Json;
+
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+
 
 namespace Client.ViewModels
 {
@@ -191,11 +192,12 @@ namespace Client.ViewModels
         public IRelayCommand UpdateStatusesCommand { get; }
 
         // Базовый адрес сервиса
-        private readonly string _baseUrl = "http://localhost:5000";
+        private readonly JsonRpcClient _rpcClient;
 
         public MainWindowViewModel()
         {
             System.Diagnostics.Debug.WriteLine("=== ViewModel создан ===");
+            _rpcClient = new JsonRpcClient("http://localhost:5000");
 
             LoadNodesCommand = new RelayCommand(async () => await LoadNodesAsync());
             AddNodeCommand = new RelayCommand(async () => await AddNodeAsync(), () => CanAddNode());
@@ -225,25 +227,12 @@ namespace Client.ViewModels
         {
             try
             {
-                using var httpClient = new HttpClient();
-                var response = await httpClient.GetAsync($"{_baseUrl}/api/nodes");
-                if (response.IsSuccessStatusCode)
-                {
-                    var nodes = await response.Content.ReadFromJsonAsync<NodeDto[]>();
-                    Nodes.Clear();
-                    foreach (var node in nodes ?? Array.Empty<NodeDto>())
-                    {
-                        Nodes.Add(node);
-                    }
-                    Greeting = $"Узлов: {Nodes.Count}";
-
-                    // Обновляем статусы после загрузки
-                    UpdateNodeStatuses();
-                }
-                else
-                {
-                    Greeting = "Ошибка загрузки узлов";
-                }
+                var loadedNodes = await _rpcClient.SendAsync<NodeDto[]>("getNodes");
+                Nodes.Clear();
+                foreach (var node in loadedNodes ?? Array.Empty<NodeDto>())
+                    Nodes.Add(node);
+                Greeting = $"Узлов: {Nodes.Count}";
+                UpdateNodeStatuses();
             }
             catch (Exception ex)
             {
@@ -251,27 +240,16 @@ namespace Client.ViewModels
             }
         }
 
-        private async Task AddNodeAsync()
+        
+private async Task AddNodeAsync()
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("=== AddNodeAsync вызван ===");
-
-                if (!int.TryParse(NewNodeId, out int id))
+                if (!int.TryParse(NewNodeId, out int id) || !double.TryParse(NewNodeValue, out double value))
                 {
-                    Greeting = "ID должен быть числом";
-                    System.Diagnostics.Debug.WriteLine("Ошибка: ID не число");
+                    Greeting = "ID или значение не число";
                     return;
                 }
-
-                if (!double.TryParse(NewNodeValue, out double value))
-                {
-                    Greeting = "Значение должно быть числом";
-                    System.Diagnostics.Debug.WriteLine("Ошибка: Значение не число");
-                    return;
-                }
-
-                System.Diagnostics.Debug.WriteLine($"ID: {id}, Name: {NewNodeName}, Value: {value}, Type: {SelectedNodeType}");
 
                 var dto = new NodeDto
                 {
@@ -281,35 +259,17 @@ namespace Client.ViewModels
                     Type = SelectedNodeType
                 };
 
-                using var httpClient = new HttpClient();
-
-                System.Diagnostics.Debug.WriteLine($"Отправка POST на {_baseUrl}/api/nodes");
-                var response = await httpClient.PostAsJsonAsync($"{_baseUrl}/api/nodes", dto);
-
-                var content = await response.Content.ReadAsStringAsync();
-                System.Diagnostics.Debug.WriteLine($"Статус ответа: {response.StatusCode}");
-                System.Diagnostics.Debug.WriteLine($"Тело ответа: {content}");
-
-                if (response.IsSuccessStatusCode)
-                {
-                    await LoadNodesAsync();
-                    NewNodeId = "";
-                    NewNodeName = "";
-                    NewNodeValue = "0";
-                    Greeting = "Узел добавлен";
-
-                    // Обновляем статусы
-                    UpdateNodeStatuses();
-                }
-                else
-                {
-                    Greeting = $"Ошибка добавления: {content}";
-                }
+                await _rpcClient.SendAsync<object>("addNode", new { node = dto });
+                await LoadNodesAsync();
+                NewNodeId = "";
+                NewNodeName = "";
+                NewNodeValue = "0";
+                Greeting = "Узел добавлен";
+                UpdateNodeStatuses();
             }
             catch (Exception ex)
             {
-                Greeting = $"Исключение: {ex.Message}";
-                System.Diagnostics.Debug.WriteLine($"ИСКЛЮЧЕНИЕ: {ex}");
+                Greeting = $"Ошибка: {ex.Message}";
             }
         }
 
@@ -319,21 +279,10 @@ namespace Client.ViewModels
             {
                 if (SelectedNode == null) return;
 
-                using var httpClient = new HttpClient();
-                var response = await httpClient.DeleteAsync($"{_baseUrl}/api/nodes/{SelectedNode.Id}");
-                if (response.IsSuccessStatusCode)
-                {
-                    await LoadNodesAsync();
-                    SelectedNode = null;
-
-                    // Обновляем статусы
-                    UpdateNodeStatuses();
-                }
-                else
-                {
-                    var error = await response.Content.ReadAsStringAsync();
-                    Greeting = $"Ошибка удаления: {error}";
-                }
+                await _rpcClient.SendAsync<object>("deleteNode", new { id = SelectedNode.Id });
+                await LoadNodesAsync();
+                SelectedNode = null;
+                UpdateNodeStatuses();
             }
             catch (Exception ex)
             {
@@ -352,25 +301,14 @@ namespace Client.ViewModels
         {
             try
             {
-                using var httpClient = new HttpClient();
-                var response = await httpClient.GetAsync($"{_baseUrl}/api/edges");
-                if (response.IsSuccessStatusCode)
-                {
-                    var edges = await response.Content.ReadFromJsonAsync<EdgeDto[]>();
-                    Edges.Clear();
-                    foreach (var edge in edges ?? Array.Empty<EdgeDto>())
-                    {
-                        Edges.Add(edge);
-                    }
-                }
-                else
-                {
-                    Greeting = "Ошибка загрузки рёбер";
-                }
+                var loadedEdges = await _rpcClient.SendAsync<EdgeDto[]>("getEdges");
+                Edges.Clear();
+                foreach (var edge in loadedEdges ?? Array.Empty<EdgeDto>())
+                    Edges.Add(edge);
             }
             catch (Exception ex)
             {
-                Greeting = $"Ошибка: {ex.Message}";
+                Greeting = $"Ошибка загрузки рёбер: {ex.Message}";
             }
         }
 
@@ -403,28 +341,17 @@ namespace Client.ViewModels
                 }
 
                 var dto = new EdgeDto { SourceId = sourceId, TargetId = targetId, Weight = weight };
-                using var httpClient = new HttpClient();
-                var response = await httpClient.PostAsJsonAsync($"{_baseUrl}/api/edges", dto);
+                await _rpcClient.SendAsync<object>("addEdge", new { edge = dto });
 
-                var content = await response.Content.ReadAsStringAsync();
-                System.Diagnostics.Debug.WriteLine($"Ответ сервера: {response.StatusCode} - {content}");
-
-                if (response.IsSuccessStatusCode)
-                {
-                    await LoadEdgesAsync();
-                    NewEdgeSource = "";
-                    NewEdgeTarget = "";
-                    NewEdgeWeight = "1";
-                    Greeting = "Ребро добавлено";
-                }
-                else
-                {
-                    Greeting = $"Ошибка: {content}";
-                }
+                await LoadEdgesAsync();
+                NewEdgeSource = "";
+                NewEdgeTarget = "";
+                NewEdgeWeight = "1";
+                Greeting = "Ребро добавлено";
             }
             catch (Exception ex)
             {
-                Greeting = $"Исключение: {ex.Message}";
+                Greeting = $"Ошибка: {ex.Message}";
                 System.Diagnostics.Debug.WriteLine($"ИСКЛЮЧЕНИЕ: {ex}");
             }
         }
@@ -435,23 +362,14 @@ namespace Client.ViewModels
             {
                 if (SelectedEdge == null) return;
 
-                using var httpClient = new HttpClient();
-                var response = await httpClient.DeleteAsync($"{_baseUrl}/api/edges/{SelectedEdge.Id}");
-                if (response.IsSuccessStatusCode)
-                {
-                    await LoadEdgesAsync();
-                    SelectedEdge = null;
-                    Greeting = "Ребро удалено";
-                }
-                else
-                {
-                    var error = await response.Content.ReadAsStringAsync();
-                    Greeting = $"Ошибка: {error}";
-                }
+                await _rpcClient.SendAsync<object>("deleteEdge", new { id = SelectedEdge.Id });
+                await LoadEdgesAsync();
+                SelectedEdge = null;
+                Greeting = "Ребро удалено";
             }
             catch (Exception ex)
             {
-                Greeting = $"Исключение: {ex.Message}";
+                Greeting = $"Ошибка: {ex.Message}";
             }
         }
 
@@ -483,25 +401,14 @@ namespace Client.ViewModels
                     return;
                 }
 
-                using var httpClient = new HttpClient();
-                var response = await httpClient.PostAsync($"{_baseUrl}/api/generate-nodes?count={count}", null);
-                if (response.IsSuccessStatusCode)
-                {
-                    Greeting = $"Сгенерировано {count} узлов";
-                    await LoadNodesAsync();
-
-                    // Обновляем статусы
-                    UpdateNodeStatuses();
-                }
-                else
-                {
-                    var error = await response.Content.ReadAsStringAsync();
-                    Greeting = $"Ошибка: {error}";
-                }
+                await _rpcClient.SendAsync<object>("generateNodes", new { count });
+                Greeting = $"Сгенерировано {count} узлов";
+                await LoadNodesAsync();
+                UpdateNodeStatuses();
             }
             catch (Exception ex)
             {
-                Greeting = $"Исключение: {ex.Message}";
+                Greeting = $"Ошибка: {ex.Message}";
             }
         }
 

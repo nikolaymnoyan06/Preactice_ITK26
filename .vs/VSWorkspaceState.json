@@ -1,6 +1,12 @@
 {
   "ExpandedNodes": [
-    ""
+    "",
+    "\\Practice_ITK26",
+    "\\Practice_ITK26\\Generator_Service26",
+    "\\Practice_ITK26\\Generator_Service26\\Generator_Service26_Server",
+    "\\Practice_ITK26\\Generator_Service26\\Generator_Service26_Server\\Model\\Dtos",
+    "\\Practice_ITK26\\Generator_Service26\\Generator_Service26_Server\\Properties"
   ],
+  "SelectedNode": "\\Practice_ITK26\\Practice_ITK26.slnx",
   "PreviewInSolutionExplorer": false
 }

@@ -25,7 +25,7 @@ namespace Client.Dtos
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public NodeType Type { get; set; }
 
-        // Статус узла (OK, NOT OK, NOT STATED) 
+        // Поле для хранения статуса
         [ObservableProperty]
         private string _status = "❓ NOT STATED";
 

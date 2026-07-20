@@ -28,7 +28,7 @@
 			<TabItem Header="📊 Таблицы">
 				<ScrollViewer VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Auto">
-					<Grid RowDefinitions="Auto,Auto,*,Auto,Auto,*,Auto,Auto"
+					<Grid RowDefinitions="Auto,Auto,*,Auto,Auto,*,Auto"
                           Margin="0,0,0,10">
 
 						<!-- Узлы -->
@@ -158,42 +158,6 @@
 								<Button Content="🔄 Обновить рёбра" Command="{Binding LoadEdgesCommand}"/>
 							</StackPanel>
 						</StackPanel>
-
-						<!-- Блок сравнения -->
-						<Border Grid.Row="6"
-                                BorderBrush="#2196F3"
-                                BorderThickness="2"
-                                CornerRadius="5"
-                                Padding="10"
-                                Margin="0,15,0,0">
-							<StackPanel Spacing="10">
-								<TextBlock Text="🔍 Сравнение значений узлов"
-                                           FontWeight="Bold"
-                                           FontSize="14"
-                                           Foreground="#2196F3"/>
-								<StackPanel Orientation="Horizontal"
-                                            Spacing="10"
-                                            VerticalAlignment="Center"
-                                            HorizontalAlignment="Left">
-									<TextBlock Text="Сравниваемое число:"
-                                               VerticalAlignment="Center"
-                                               FontWeight="Bold"/>
-									<TextBox Width="120"
-                                             Text="{Binding CompareThreshold}"
-                                             Watermark="Введите число"/>
-									<Button Content="🔄 Обновить статусы"
-                                            Command="{Binding UpdateStatusesCommand}"
-                                            Background="#2196F3"
-                                            Foreground="White"
-                                            Padding="15,5"/>
-
-									<!-- Исправлено: символы < и > заменены на сущности &lt; и &gt; -->
-									<TextBlock Text="(OK: оба &gt;= числа, NOT OK: одно &lt; числа, NOT STATED: нет значения)"
-                                               FontSize="11"
-                                               Foreground="Gray"/>
-								</StackPanel>
-							</StackPanel>
-						</Border>
 
 					</Grid>
 				</ScrollViewer>

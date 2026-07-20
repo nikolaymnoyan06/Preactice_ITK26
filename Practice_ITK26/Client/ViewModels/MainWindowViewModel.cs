@@ -7,11 +7,9 @@ using CommunityToolkit.Mvvm.Input;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-
 
 namespace Client.ViewModels
 {
@@ -91,21 +89,6 @@ namespace Client.ViewModels
         {
             get => _selectedNodeType;
             set => SetProperty(ref _selectedNodeType, value);
-        }
-
-        // ========== ПОЛЯ ДЛЯ СРАВНЕНИЯ ==========
-
-        private string _compareThreshold = "50";
-        public string CompareThreshold
-        {
-            get => _compareThreshold;
-            set
-            {
-                if (SetProperty(ref _compareThreshold, value))
-                {
-                    UpdateNodeStatuses();
-                }
-            }
         }
 
         // ========== РЁБРА ==========
@@ -212,6 +195,7 @@ namespace Client.ViewModels
             AddEdgeCommand = new RelayCommand(async () => await AddEdgeAsync(), () => CanAddEdge());
             DeleteEdgeCommand = new RelayCommand(async () => await DeleteEdgeAsync(), () => SelectedEdge != null);
 
+            // команда логики статуса
             UpdateStatusesCommand = new RelayCommand(UpdateNodeStatuses);
 
             GraphVisualizationViewModel.Nodes = Nodes;
@@ -230,6 +214,8 @@ namespace Client.ViewModels
                 foreach (var node in loadedNodes ?? Array.Empty<NodeDto>())
                     Nodes.Add(node);
                 Greeting = $"Узлов: {Nodes.Count}";
+
+                // Обновляем статусы сразу после загрузки
                 UpdateNodeStatuses();
             }
             catch (Exception ex)
@@ -238,7 +224,6 @@ namespace Client.ViewModels
             }
         }
 
-        // используем InValue и OutValue
         private async Task AddNodeAsync()
         {
             try
@@ -262,12 +247,12 @@ namespace Client.ViewModels
 
                 await _rpcClient.SendAsync<object>("addNode", new { node = dto });
                 await LoadNodesAsync();
+
                 NewNodeId = "";
                 NewNodeName = "";
                 NewNodeInValue = "0";
                 NewNodeOutValue = "0";
                 Greeting = "Узел добавлен";
-                UpdateNodeStatuses();
             }
             catch (Exception ex)
             {
@@ -284,7 +269,6 @@ namespace Client.ViewModels
                 await _rpcClient.SendAsync<object>("deleteNode", new { id = SelectedNode.Id });
                 await LoadNodesAsync();
                 SelectedNode = null;
-                UpdateNodeStatuses();
             }
             catch (Exception ex)
             {
@@ -400,7 +384,6 @@ namespace Client.ViewModels
                 await _rpcClient.SendAsync<object>("generateNodes", new { count });
                 Greeting = $"Сгенерировано {count} узлов";
                 await LoadNodesAsync();
-                UpdateNodeStatuses();
             }
             catch (Exception ex)
             {
@@ -414,45 +397,19 @@ namespace Client.ViewModels
             return result;
         }
 
-        #region Методы для сравнения значений узлов
+        #region Методы для обновления статусов (по In/Out и типу)
 
         /// <summary>
-        /// Обновляет статусы всех узлов на основе сравниваемого числа.
-        /// Статус отображается в колонке "Статус" таблицы узлов.
+        /// Обновляет статусы всех узлов на основе их Входящего/Выходящего значения и типа.
+        /// Логика вынесена в отдельный класс NodeStatusEvaluator.
         /// </summary>
         private void UpdateNodeStatuses()
         {
-            if (!double.TryParse(CompareThreshold, out double threshold))
-            {
-                foreach (var node in Nodes)
-                {
-                    node.Status = "❌ Ошибка";
-                }
-                return;
-            }
-
-            if (Nodes.Count == 0)
-            {
-                return;
-            }
+            if (Nodes.Count == 0) return;
 
             foreach (var node in Nodes)
             {
-                bool inOk = !double.IsNaN(node.InValue) && node.InValue >= threshold;
-                bool outOk = !double.IsNaN(node.OutValue) && node.OutValue >= threshold;
-
-                if (double.IsNaN(node.InValue) || double.IsNaN(node.OutValue))
-                {
-                    node.Status = "❓ NOT STATED";
-                }
-                else if (inOk && outOk)
-                {
-                    node.Status = "✅ OK";
-                }
-                else
-                {
-                    node.Status = "❌ NOT OK";
-                }
+                node.Status = Client.Models.NodeStatusEvaluator.EvaluateStatus(node);
             }
         }
 

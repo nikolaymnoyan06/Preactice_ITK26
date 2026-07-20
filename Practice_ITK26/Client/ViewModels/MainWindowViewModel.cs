@@ -53,11 +53,18 @@ namespace Client.ViewModels
             set => SetProperty(ref _newNodeName, value);
         }
 
-        private string _newNodeValue = "0";
-        public string NewNodeValue
+        private string _newNodeInValue = "0";
+        public string NewNodeInValue
         {
-            get => _newNodeValue;
-            set => SetProperty(ref _newNodeValue, value);
+            get => _newNodeInValue;
+            set => SetProperty(ref _newNodeInValue, value);
+        }
+
+        private string _newNodeOutValue = "0";
+        public string NewNodeOutValue
+        {
+            get => _newNodeOutValue;
+            set => SetProperty(ref _newNodeOutValue, value);
         }
 
         // Выбранный узел для удаления
@@ -89,9 +96,6 @@ namespace Client.ViewModels
         // ========== ПОЛЯ ДЛЯ СРАВНЕНИЯ ==========
 
         private string _compareThreshold = "50";
-        /// <summary>
-        /// Сравниваемое число для статуса узлов.
-        /// </summary>
         public string CompareThreshold
         {
             get => _compareThreshold;
@@ -99,7 +103,7 @@ namespace Client.ViewModels
             {
                 if (SetProperty(ref _compareThreshold, value))
                 {
-                    UpdateNodeStatuses(); // Автоматически обновляем статусы при изменении числа
+                    UpdateNodeStatuses();
                 }
             }
         }
@@ -164,7 +168,7 @@ namespace Client.ViewModels
             }
         }
 
-        // ========== НОВОЕ: поле для количества генерируемых узлов ==========
+        // ========== поле для количества генерируемых узлов ==========
         private string _generateCount = "10";
         public string GenerateCount
         {
@@ -186,9 +190,6 @@ namespace Client.ViewModels
         public IRelayCommand AddEdgeCommand { get; }
         public IRelayCommand DeleteEdgeCommand { get; }
         public IRelayCommand GenerateNodesCommand { get; }
-        /// <summary>
-        /// Команда обновления статусов узлов.
-        /// </summary>
         public IRelayCommand UpdateStatusesCommand { get; }
 
         // Базовый адрес сервиса
@@ -211,14 +212,11 @@ namespace Client.ViewModels
             AddEdgeCommand = new RelayCommand(async () => await AddEdgeAsync(), () => CanAddEdge());
             DeleteEdgeCommand = new RelayCommand(async () => await DeleteEdgeAsync(), () => SelectedEdge != null);
 
-            // Команда обновления статусов
             UpdateStatusesCommand = new RelayCommand(UpdateNodeStatuses);
 
-            // Связываем ViewModel визуализации с коллекциями
             GraphVisualizationViewModel.Nodes = Nodes;
             GraphVisualizationViewModel.Edges = Edges;
 
-            // При запуске сразу загружаем узлы и рёбра
             LoadNodesCommand.Execute(null);
             LoadEdgesCommand.Execute(null);
         }
@@ -240,12 +238,14 @@ namespace Client.ViewModels
             }
         }
 
-        
-private async Task AddNodeAsync()
+        // используем InValue и OutValue
+        private async Task AddNodeAsync()
         {
             try
             {
-                if (!int.TryParse(NewNodeId, out int id) || !double.TryParse(NewNodeValue, out double value))
+                if (!int.TryParse(NewNodeId, out int id) ||
+                    !double.TryParse(NewNodeInValue, out double inValue) ||
+                    !double.TryParse(NewNodeOutValue, out double outValue))
                 {
                     Greeting = "ID или значение не число";
                     return;
@@ -255,7 +255,8 @@ private async Task AddNodeAsync()
                 {
                     Id = id,
                     Name = NewNodeName,
-                    Value = value,
+                    InValue = inValue,
+                    OutValue = outValue,
                     Type = SelectedNodeType
                 };
 
@@ -263,7 +264,8 @@ private async Task AddNodeAsync()
                 await LoadNodesAsync();
                 NewNodeId = "";
                 NewNodeName = "";
-                NewNodeValue = "0";
+                NewNodeInValue = "0";
+                NewNodeOutValue = "0";
                 Greeting = "Узел добавлен";
                 UpdateNodeStatuses();
             }
@@ -320,8 +322,6 @@ private async Task AddNodeAsync()
                 string targetStr = NewEdgeTarget?.Trim() ?? "";
                 string weightStr = NewEdgeWeight?.Trim() ?? "1";
 
-                System.Diagnostics.Debug.WriteLine($"AddEdgeAsync: source='{sourceStr}', target='{targetStr}', weight='{weightStr}'");
-
                 if (!int.TryParse(sourceStr, out int sourceId))
                 {
                     Greeting = "Source ID должен быть числом";
@@ -352,7 +352,6 @@ private async Task AddNodeAsync()
             catch (Exception ex)
             {
                 Greeting = $"Ошибка: {ex.Message}";
-                System.Diagnostics.Debug.WriteLine($"ИСКЛЮЧЕНИЕ: {ex}");
             }
         }
 
@@ -378,10 +377,7 @@ private async Task AddNodeAsync()
             bool sourceOk = int.TryParse(NewEdgeSource, out int source);
             bool targetOk = int.TryParse(NewEdgeTarget, out int target);
             bool weightOk = double.TryParse(NewEdgeWeight, out double weight) && weight > 0;
-            bool result = sourceOk && targetOk && weightOk;
-
-            System.Diagnostics.Debug.WriteLine($"CanAddEdge: source='{NewEdgeSource}' ({sourceOk}), target='{NewEdgeTarget}' ({targetOk}), weight='{NewEdgeWeight}' ({weightOk}) -> {result}");
-            return result;
+            return sourceOk && targetOk && weightOk;
         }
 
         // ========== МЕТОДЫ ДЛЯ ГЕНЕРАЦИИ ==========
@@ -426,10 +422,8 @@ private async Task AddNodeAsync()
         /// </summary>
         private void UpdateNodeStatuses()
         {
-            // Проверяем, что сравниваемое число — число
             if (!double.TryParse(CompareThreshold, out double threshold))
             {
-                // Если не число, показываем "Ошибка" для всех узлов
                 foreach (var node in Nodes)
                 {
                     node.Status = "❌ Ошибка";
@@ -437,21 +431,21 @@ private async Task AddNodeAsync()
                 return;
             }
 
-            // Если узлов нет, выходим
             if (Nodes.Count == 0)
             {
                 return;
             }
 
-            // Обновляем статус для каждого узла
             foreach (var node in Nodes)
             {
-                // Проверяем значение узла
-                if (double.IsNaN(node.Value))
+                bool inOk = !double.IsNaN(node.InValue) && node.InValue >= threshold;
+                bool outOk = !double.IsNaN(node.OutValue) && node.OutValue >= threshold;
+
+                if (double.IsNaN(node.InValue) || double.IsNaN(node.OutValue))
                 {
                     node.Status = "❓ NOT STATED";
                 }
-                else if (node.Value >= threshold)
+                else if (inOk && outOk)
                 {
                     node.Status = "✅ OK";
                 }
@@ -477,6 +471,5 @@ private async Task AddNodeAsync()
             get => _graphVisualizationViewModel;
             set => SetProperty(ref _graphVisualizationViewModel, value);
         }
-
     }
 }

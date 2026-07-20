@@ -15,7 +15,8 @@ namespace Generator_Service26_Server.Model
             var faker = new Faker<NodeDto>()
                 .RuleFor(n => n.Id, f => f.UniqueIndex + 1)                  // Уникальный ID
                 .RuleFor(n => n.Name, f => f.Name.FullName())                // Имя узла
-                .RuleFor(n => n.Value, f => f.Random.Double(1, 100))         // Числовое значение
+                .RuleFor(n => n.InValue, f => f.Random.Double(1, 100))       // Входящее значение
+                .RuleFor(n => n.OutValue, f => f.Random.Double(1, 100))      // Выходящее значение
                 .RuleFor(n => n.Type, f => f.PickRandom<NodeType>());        // Случайный тип из DTO
 
             // Возвращаем сгенерированный список DTO

@@ -4,7 +4,7 @@
         xmlns:views="using:Client.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:dg="using:Avalonia.Controls"
+        xmlns:dg="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.DataGrid"
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
         x:Class="Client.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -48,31 +48,31 @@
                                      MaxHeight="300"
                                      Margin="0,0,0,10">
 							<dg:DataGrid.Columns>
-								<!-- КОЛОНКА ID: ширина по содержимому, но не меньше 60 -->
 								<dg:DataGridTextColumn Header="ID"
                                                        Binding="{Binding Id}"
                                                        Width="Auto"
                                                        MinWidth="60"/>
 
-								<!-- КОЛОНКА Имя: ширина по содержимому, но не меньше 150 -->
 								<dg:DataGridTextColumn Header="Имя"
                                                        Binding="{Binding Name}"
                                                        Width="Auto"
                                                        MinWidth="150"/>
 
-								<!-- КОЛОНКА Значение: ширина по содержимому, но не меньше 100 -->
-								<dg:DataGridTextColumn Header="Значение"
-                                                       Binding="{Binding Value}"
+								<dg:DataGridTextColumn Header="Входящее"
+                                                       Binding="{Binding InValue}"
                                                        Width="Auto"
                                                        MinWidth="100"/>
 
-								<!-- КОЛОНКА Тип: ширина по содержимому, но не меньше 100 -->
+								<dg:DataGridTextColumn Header="Выходящее"
+                                                       Binding="{Binding OutValue}"
+                                                       Width="Auto"
+                                                       MinWidth="100"/>
+
 								<dg:DataGridTextColumn Header="Тип"
                                                        Binding="{Binding Type}"
                                                        Width="Auto"
                                                        MinWidth="100"/>
 
-								<!-- НОВАЯ КОЛОНКА: Статус (OK/NOT OK/NOT STATED) -->
 								<dg:DataGridTextColumn Header="Статус"
                                                        Binding="{Binding Status}"
                                                        Width="Auto"
@@ -87,7 +87,8 @@
                                         HorizontalAlignment="Left">
 								<TextBox Width="80" Watermark="ID" Text="{Binding NewNodeId}"/>
 								<TextBox Width="150" Watermark="Имя" Text="{Binding NewNodeName}"/>
-								<TextBox Width="120" Watermark="Значение (число)" Text="{Binding NewNodeValue}"/>
+								<TextBox Width="120" Watermark="Входящее" Text="{Binding NewNodeInValue}"/>
+								<TextBox Width="120" Watermark="Выходящее" Text="{Binding NewNodeOutValue}"/>
 								<ComboBox Width="120" ItemsSource="{Binding NodeTypes}" SelectedItem="{Binding SelectedNodeType}"/>
 								<Button Content="➕ Добавить узел" Command="{Binding AddNodeCommand}"/>
 							</StackPanel>
@@ -118,25 +119,21 @@
                                      MaxHeight="200"
                                      Margin="0,0,0,10">
 							<dg:DataGrid.Columns>
-								<!-- КОЛОНКА ID: ширина по содержимому -->
 								<dg:DataGridTextColumn Header="ID"
                                                        Binding="{Binding Id}"
                                                        Width="Auto"
                                                        MinWidth="60"/>
 
-								<!-- КОЛОНКА Source: ширина по содержимому -->
 								<dg:DataGridTextColumn Header="Source"
                                                        Binding="{Binding SourceId}"
                                                        Width="Auto"
                                                        MinWidth="80"/>
 
-								<!-- КОЛОНКА Target: ширина по содержимому -->
 								<dg:DataGridTextColumn Header="Target"
                                                        Binding="{Binding TargetId}"
                                                        Width="Auto"
                                                        MinWidth="80"/>
 
-								<!-- КОЛОНКА Вес: ширина по содержимому -->
 								<dg:DataGridTextColumn Header="Вес"
                                                        Binding="{Binding Weight}"
                                                        Width="Auto"
@@ -162,9 +159,7 @@
 							</StackPanel>
 						</StackPanel>
 
-						<!-- ========================================
-                             БЛОК СРАВНЕНИЯ
-                             ======================================== -->
+						<!-- Блок сравнения -->
 						<Border Grid.Row="6"
                                 BorderBrush="#2196F3"
                                 BorderThickness="2"
@@ -191,7 +186,9 @@
                                             Background="#2196F3"
                                             Foreground="White"
                                             Padding="15,5"/>
-									<TextBlock Text="(OK: >= число, NOT OK: &lt; число, NOT STATED: нет значения)"
+
+									<!-- Исправлено: символы < и > заменены на сущности &lt; и &gt; -->
+									<TextBlock Text="(OK: оба &gt;= числа, NOT OK: одно &lt; числа, NOT STATED: нет значения)"
                                                FontSize="11"
                                                Foreground="Gray"/>
 								</StackPanel>

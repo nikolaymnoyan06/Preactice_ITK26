@@ -5,7 +5,6 @@ using System.Text.Json.Serialization;
 namespace Client.Dtos
 {
     /// <summary>
-    /// Data Transfer Object (DTO) для представления узла графа.
     /// Используется для передачи данных о вершине и её типе.
     /// </summary>
     public partial class NodeDto : ObservableObject
@@ -16,21 +15,23 @@ namespace Client.Dtos
         // Имя узла
         public string Name { get; set; } = string.Empty;
 
-        // Значение, хранящееся в узле (числовое).
-        public double Value { get; set; }
+        // Входящее значение узла (числовое).
+        public double InValue { get; set; }
 
-        // Тип узла (например, начальный, конечный, промежуточный и т.п.).
+        // Выходящее значение узла (числовое).
+        public double OutValue { get; set; }
+
+        // Тип узла 
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public NodeType Type { get; set; }
 
-        // НОВОЕ: Статус узла (OK, NOT OK, NOT STATED) - вычисляемое поле.
-        // Теперь это ObservableProperty, чтобы изменения автоматически уведомляли UI.
+        // Статус узла (OK, NOT OK, NOT STATED) 
         [ObservableProperty]
         private string _status = "❓ NOT STATED";
 
         /// <summary>
-        /// Возвращает строковое представление узла в формате: "Имя (Значение) - Тип".
+        /// Возвращает строковое представление узла в формате: "Имя (In: X, Out: Y) - Тип".
         /// </summary>
-        public override string ToString() => $"{Name} ({Value}) - {Type}";
+        public override string ToString() => $"{Name} (In: {InValue}, Out: {OutValue}) - {Type}";
     }
 }

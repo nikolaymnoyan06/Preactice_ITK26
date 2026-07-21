@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+	 
   </ItemGroup>
 
   <ItemGroup>
@@ -24,9 +25,20 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Google.Protobuf" Version="3.35.1" />
+    <PackageReference Include="Grpc" Version="2.46.6" />
+    <PackageReference Include="Grpc.AspNetCore" Version="2.80.0" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.80.0" />
+    <PackageReference Include="Grpc.Tools" Version="2.82.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="ReactiveUI.Avalonia" Version="11.3.8" />
     <PackageReference Include="RpcToolkit" Version="1.1.5" />
     <PackageReference Include="RpcToolkit.AspNetCore" Version="1.1.5" />
     <PackageReference Include="System.Net.Http.Json" Version="10.0.9" />
   </ItemGroup>
+	<ItemGroup>
+		<Protobuf Include="Protos\graph.proto" GrpcServices="Client" />
+	</ItemGroup>
 </Project>

@@ -1,12 +1,16 @@
 ﻿using Client.Dtos;
 using Client.Models;
+
 using Client.Models.Dtos;
-using Client.Models.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+
+using Grpc.Core;
+using Grpc.Net.Client;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -176,12 +180,17 @@ namespace Client.ViewModels
         public IRelayCommand UpdateStatusesCommand { get; }
 
         // Базовый адрес сервиса
-        private readonly JsonRpcClient _rpcClient;
+        private readonly global::Graph.GraphService.GraphServiceClient _grpcClient;
 
         public MainWindowViewModel()
         {
             System.Diagnostics.Debug.WriteLine("=== ViewModel создан ===");
-            _rpcClient = new JsonRpcClient("http://localhost:5000");
+            var channel = GrpcChannel.ForAddress("http://localhost:5000", new GrpcChannelOptions
+            {
+                HttpHandler = new HttpClientHandler()
+            });
+            _grpcClient = new global::Graph.GraphService.GraphServiceClient(channel);
+            _grpcClient = new Graph.GraphService.GraphServiceClient(channel);
 
             LoadNodesCommand = new RelayCommand(async () => await LoadNodesAsync());
             AddNodeCommand = new RelayCommand(async () => await AddNodeAsync(), () => CanAddNode());
@@ -209,14 +218,16 @@ namespace Client.ViewModels
         {
             try
             {
-                var loadedNodes = await _rpcClient.SendAsync<NodeDto[]>("getNodes");
+                var response = await _grpcClient.GetNodesAsync(new global::Graph.Empty());
                 Nodes.Clear();
-                foreach (var node in loadedNodes ?? Array.Empty<NodeDto>())
-                    Nodes.Add(node);
+                foreach (var protoNode in response.Nodes)
+                    Nodes.Add(protoNode.ToClientDto());
                 Greeting = $"Узлов: {Nodes.Count}";
-
-                // Обновляем статусы сразу после загрузки
                 UpdateNodeStatuses();
+            }
+            catch (RpcException ex)
+            {
+                Greeting = $"Ошибка: {ex.Status.Detail}";
             }
             catch (Exception ex)
             {
@@ -236,7 +247,7 @@ namespace Client.ViewModels
                     return;
                 }
 
-                var dto = new NodeDto
+                var clientNode = new NodeDto // это Client.Dtos.NodeDto
                 {
                     Id = id,
                     Name = NewNodeName,
@@ -244,8 +255,8 @@ namespace Client.ViewModels
                     OutValue = outValue,
                     Type = SelectedNodeType
                 };
-
-                await _rpcClient.SendAsync<object>("addNode", new { node = dto });
+                var request = new global::Graph.AddNodeRequest { Node = clientNode.ToProto() };
+                await _grpcClient.AddNodeAsync(request);
                 await LoadNodesAsync();
 
                 NewNodeId = "";
@@ -253,6 +264,10 @@ namespace Client.ViewModels
                 NewNodeInValue = "0";
                 NewNodeOutValue = "0";
                 Greeting = "Узел добавлен";
+            }
+            catch (RpcException ex)
+            {
+                Greeting = $"Ошибка: {ex.Status.Detail}";
             }
             catch (Exception ex)
             {
@@ -265,10 +280,14 @@ namespace Client.ViewModels
             try
             {
                 if (SelectedNode == null) return;
-
-                await _rpcClient.SendAsync<object>("deleteNode", new { id = SelectedNode.Id });
+                var request = new global::Graph.DeleteNodeRequest { Id = SelectedNode.Id };
+                await _grpcClient.DeleteNodeAsync(request);
                 await LoadNodesAsync();
                 SelectedNode = null;
+            }
+            catch (RpcException ex)
+            {
+                Greeting = $"Ошибка: {ex.Status.Detail}";
             }
             catch (Exception ex)
             {
@@ -287,10 +306,14 @@ namespace Client.ViewModels
         {
             try
             {
-                var loadedEdges = await _rpcClient.SendAsync<EdgeDto[]>("getEdges");
+                var response = await _grpcClient.GetEdgesAsync(new global::Graph.Empty());
                 Edges.Clear();
-                foreach (var edge in loadedEdges ?? Array.Empty<EdgeDto>())
-                    Edges.Add(edge);
+                foreach (var protoEdge in response.Edges)
+                    Edges.Add(protoEdge.ToClientDto());
+            }
+            catch (RpcException ex)
+            {
+                Greeting = $"Ошибка загрузки рёбер: {ex.Status.Detail}";
             }
             catch (Exception ex)
             {
@@ -306,32 +329,26 @@ namespace Client.ViewModels
                 string targetStr = NewEdgeTarget?.Trim() ?? "";
                 string weightStr = NewEdgeWeight?.Trim() ?? "1";
 
-                if (!int.TryParse(sourceStr, out int sourceId))
+                if (!int.TryParse(sourceStr, out int sourceId) ||
+                    !int.TryParse(targetStr, out int targetId) ||
+                    !double.TryParse(weightStr, out double weight) || weight <= 0)
                 {
-                    Greeting = "Source ID должен быть числом";
+                    Greeting = "Некорректные данные ребра";
                     return;
                 }
 
-                if (!int.TryParse(targetStr, out int targetId))
-                {
-                    Greeting = "Target ID должен быть числом";
-                    return;
-                }
-
-                if (!double.TryParse(weightStr, out double weight) || weight <= 0)
-                {
-                    Greeting = "Вес должен быть положительным числом";
-                    return;
-                }
-
-                var dto = new EdgeDto { SourceId = sourceId, TargetId = targetId, Weight = weight };
-                await _rpcClient.SendAsync<object>("addEdge", new { edge = dto });
-
+                var clientEdge = new EdgeDto { SourceId = sourceId, TargetId = targetId, Weight = weight, Id = 0 };
+                var request = new global::Graph.AddEdgeRequest { Edge = clientEdge.ToProto() };
+                await _grpcClient.AddEdgeAsync(request);
                 await LoadEdgesAsync();
                 NewEdgeSource = "";
                 NewEdgeTarget = "";
                 NewEdgeWeight = "1";
                 Greeting = "Ребро добавлено";
+            }
+            catch (RpcException ex)
+            {
+                Greeting = $"Ошибка: {ex.Status.Detail}";
             }
             catch (Exception ex)
             {
@@ -344,11 +361,15 @@ namespace Client.ViewModels
             try
             {
                 if (SelectedEdge == null) return;
-
-                await _rpcClient.SendAsync<object>("deleteEdge", new { id = SelectedEdge.Id });
+                var request = new global::Graph.DeleteEdgeRequest { Id = SelectedEdge.Id };
+                await _grpcClient.DeleteEdgeAsync(request);
                 await LoadEdgesAsync();
                 SelectedEdge = null;
                 Greeting = "Ребро удалено";
+            }
+            catch (RpcException ex)
+            {
+                Greeting = $"Ошибка: {ex.Status.Detail}";
             }
             catch (Exception ex)
             {
@@ -380,10 +401,14 @@ namespace Client.ViewModels
                     Greeting = "Введите положительное число";
                     return;
                 }
-
-                await _rpcClient.SendAsync<object>("generateNodes", new { count });
-                Greeting = $"Сгенерировано {count} узлов";
+                var request = new global::Graph.GenerateNodesRequest { Count = count };
+                var response = await _grpcClient.GenerateNodesAsync(request);
+                Greeting = response.Message;
                 await LoadNodesAsync();
+            }
+            catch (RpcException ex)
+            {
+                Greeting = $"Ошибка: {ex.Status.Detail}";
             }
             catch (Exception ex)
             {

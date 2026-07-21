@@ -1,6 +1,6 @@
 using Generator_Service26.Model.Dtos;
 using Generator_Service26_Server.Model;
-using Generator_Service26_Server.Model.Dtos;
+using Generator_Service26_Server.Services;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -12,6 +12,9 @@ var jsonOptions = new JsonSerializerOptions
 };
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddScoped<GraphDatabaseService>();
+
 
 // Принудительно слушаем порт 5000 
 builder.WebHost.UseUrls("http://localhost:5000");
@@ -51,9 +54,8 @@ var nextEdgeId = 1;
 object HandleGetNodes() => nodes;
 
 /// <summary>Добавить новый узел.</summary>
-object HandleAddNode(JsonElement parameters)
+async Task<object> HandleAddNode(JsonElement parameters, GraphDatabaseService dbService)
 {
-    // Из параметров извлекаем объект "node"
     var dto = parameters.GetProperty("node").Deserialize<NodeDto>(jsonOptions)
         ?? throw new ArgumentException("Неверный формат узла");
 
@@ -63,10 +65,13 @@ object HandleAddNode(JsonElement parameters)
     if (string.IsNullOrEmpty(dto.Name))
         dto.Name = $"Узел {dto.Id}";
 
-    nodes.Add(dto);
+    nodes.Add(dto); // Оставляем в памяти (если нужно)
+
+    // --- ОТПРАВЛЯЕМ В БАЗУ ДАННЫХ ITK ---
+    await dbService.AddNodeAsync(dto);
+
     return new { message = "Узел добавлен", id = dto.Id };
 }
-
 /// <summary>Удалить узел по ID.</summary>
 object HandleDeleteNode(JsonElement parameters)
 {
@@ -87,7 +92,7 @@ object HandleDeleteNode(JsonElement parameters)
 object HandleGetEdges() => edges;
 
 /// <summary>Добавить ребро.</summary>
-object HandleAddEdge(JsonElement parameters)
+async Task<object> HandleAddEdge(JsonElement parameters, GraphDatabaseService dbService)
 {
     var dto = parameters.GetProperty("edge").Deserialize<EdgeDto>(jsonOptions)
         ?? throw new ArgumentException("Неверный формат ребра");
@@ -97,11 +102,7 @@ object HandleAddEdge(JsonElement parameters)
     if (!nodes.Any(n => n.Id == dto.TargetId))
         throw new ArgumentException($"Узел-приёмник {dto.TargetId} не найден");
 
-    // Авто-ID, если не указан или указан 0
-    if (dto.Id == 0)
-    {
-        dto.Id = nextEdgeId++;
-    }
+    if (dto.Id == 0) dto.Id = nextEdgeId++;
     else
     {
         if (edges.Any(e => e.Id == dto.Id))
@@ -111,9 +112,12 @@ object HandleAddEdge(JsonElement parameters)
     }
 
     edges.Add(dto);
+
+    // --- ОТПРАВЛЯЕМ В БАЗУ ДАННЫХ ITK ---
+    await dbService.AddEdgeAsync(dto);
+
     return new { message = "Ребро добавлено", id = dto.Id };
 }
-
 /// <summary>Удалить ребро по ID.</summary>
 object HandleDeleteEdge(JsonElement parameters)
 {
@@ -128,10 +132,9 @@ object HandleDeleteEdge(JsonElement parameters)
 }
 
 /// <summary>Сгенерировать узлы через Generator.</summary>
-object HandleGenerateNodes(JsonElement parameters)
+async Task<object> HandleGenerateNodes(JsonElement parameters, GraphDatabaseService dbService)
 {
     int count = parameters.GetProperty("count").GetInt32();
-
     if (count <= 0 || count > 100)
         throw new ArgumentException("Количество должно быть от 1 до 100");
 
@@ -144,32 +147,34 @@ object HandleGenerateNodes(JsonElement parameters)
         maxId++;
         node.Id = maxId;
         nodes.Add(node);
+
+        // --- СОХРАНЯЕМ КАЖДЫЙ СГЕНЕРИРОВАННЫЙ УЗЕЛ В БД ---
+        await dbService.AddNodeAsync(node);
     }
 
     return new { message = $"Сгенерировано {count} узлов", totalNodes = nodes.Count };
-}
 
-// ДИСПЕТЧЕР МЕТОДОВ 
-// ------------------------------------------------------------------
-object? DispatchMethod(string method, JsonElement? parameters)
-{
-    return method switch
+    // ДИСПЕТЧЕР МЕТОДОВ 
+    // ------------------------------------------------------------------
+    async Task<object?> DispatchMethod(string method, JsonElement? parameters, GraphDatabaseService dbService)
     {
-        "getNodes" => HandleGetNodes(),
-        "addNode" => HandleAddNode(parameters!.Value),
-        "deleteNode" => HandleDeleteNode(parameters!.Value),
-        "getEdges" => HandleGetEdges(),
-        "addEdge" => HandleAddEdge(parameters!.Value),
-        "deleteEdge" => HandleDeleteEdge(parameters!.Value),
-        "generateNodes" => HandleGenerateNodes(parameters!.Value),
-        _ => throw new InvalidOperationException($"Неизвестный метод: {method}")
-    };
-}
+        return method switch
+        {
+            "getNodes" => HandleGetNodes(),
+            "addNode" => await HandleAddNode(parameters!.Value, dbService),
+            "deleteNode" => HandleDeleteNode(parameters!.Value),
+            "getEdges" => HandleGetEdges(),
+            "addEdge" => await HandleAddEdge(parameters!.Value, dbService),
+            "deleteEdge" => HandleDeleteEdge(parameters!.Value),
+            "generateNodes" => await HandleGenerateNodes(parameters!.Value, dbService),
+            _ => throw new InvalidOperationException($"Неизвестный метод: {method}")
+        };
+    }
 
 
-// ЕДИНЫЙ JSON-RPC ЭНДПОИНТ
-// ------------------------------------------------------------------
-app.MapPost("/jsonrpc", async (HttpContext context) =>
+    // ЕДИНЫЙ JSON-RPC ЭНДПОИНТ
+    // ------------------------------------------------------------------
+    app.MapPost("/jsonrpc", async (HttpContext context) =>
 {
     try
     {

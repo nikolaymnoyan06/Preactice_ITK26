@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+option csharp_namespace = "Generator_Service26_Server.Protos";
+
+package graph;
+
+// Описание gRPC сервиса
+service GraphGrpc {
+  rpc AddNode (AddNodeRequest) returns (AddNodeResponse);
+  rpc AddEdge (AddEdgeRequest) returns (AddEdgeResponse);
+  rpc GenerateNodes (GenerateNodesRequest) returns (GenerateNodesResponse);
+}
+
+// Модели данных
+message NodeModel {
+  int32 id = 1;
+  string name = 2;
+  int32 type = 3;
+  double value = 4;
+}
+
+message EdgeModel {
+  int32 id = 1;
+  int32 sourceId = 2;
+  int32 targetId = 3;
+  double weight = 4;
+}
+
+// Запросы и ответы
+message AddNodeRequest {
+  NodeModel node = 1;
+}
+
+message AddNodeResponse {
+  string message = 1;
+  int32 id = 2;
+}
+
+message AddEdgeRequest {
+  EdgeModel edge = 1;
+}
+
+message AddEdgeResponse {
+  string message = 1;
+  int32 id = 2;
+}
+
+message GenerateNodesRequest {
+  int32 count = 1;
+}
+
+message GenerateNodesResponse {
+  string message = 1;
+  int32 totalNodes = 2;
+}
+Важно: В файле .csproj репозитория должна быть строка подключения proto-файла:
+
+XML
+<ItemGroup>
+  <Protobuf Include="Protos\graph.proto" GrpcServices="Server" />
+</ItemGroup>
+2. Реализация gRPC-сервиса: Services/GraphGrpcService.cs
+Создайте класс GraphGrpcService.cs в папке Services. Он будет принимать gRPC-запросы и передавать данные в ваш GraphDatabaseService для записи в PostgreSQL:
+
+C#
+using Grpc.Core;
+using Generator_Service26_Server.Protos;
+using Generator_Service26_Server.Model.Dtos;
+
+namespace Generator_Service26_Server.Services;
+
+public class GraphGrpcServiceImpl : GraphGrpc.GraphGrpcBase
+{
+    private readonly GraphDatabaseService _dbService;
+
+    // Внедряем сервис БД через Dependency Injection
+    public GraphGrpcServiceImpl(GraphDatabaseService dbService)
+    {
+        _dbService = dbService;
+    }
+
+    public override async Task<AddNodeResponse> AddNode(AddNodeRequest request, ServerCallContext context)
+    {
+        var dto = new NodeDto
+        {
+            Id = request.Node.Id,
+            Name = string.IsNullOrEmpty(request.Node.Name) ? $"Узел {request.Node.Id}" : request.Node.Name,
+            Value = request.Node.Value
+        };
+
+        // Пишем в БД PostgreSQL
+        await _dbService.AddNodeAsync(dto);
+
+        return new AddNodeResponse 
+        { 
+            Message = "Узел успешно добавлен в PostgreSQL", 
+            Id = dto.Id 
+        };
+    }
+
+    public override async Task<AddEdgeResponse> AddEdge(AddEdgeRequest request, ServerCallContext context)
+    {
+        var dto = new EdgeDto
+        {
+            Id = request.Edge.Id,
+            SourceId = request.Edge.SourceId,
+            TargetId = request.Edge.TargetId,
+            Weight = request.Edge.Weight
+        };
+
+        // Пишем в БД PostgreSQL
+        await _dbService.AddEdgeAsync(dto);
+
+        return new AddEdgeResponse 
+        { 
+            Message = "Ребро успешно добавлено в PostgreSQL", 
+            Id = dto.Id 
+        };
+    }
+}

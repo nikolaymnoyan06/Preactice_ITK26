@@ -1,5 +1,6 @@
 using Npgsql;
-using Generator_Service26_Server.Model.Dtos; // Подключаем DTO
+using Generator_Service26.Model.Dtos; // Подключаем DTO
+
 
 namespace Generator_Service26_Server.Services;
 

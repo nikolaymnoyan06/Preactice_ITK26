@@ -190,7 +190,6 @@ namespace Client.ViewModels
                 HttpHandler = new HttpClientHandler()
             });
             _grpcClient = new global::Graph.GraphService.GraphServiceClient(channel);
-            _grpcClient = new Graph.GraphService.GraphServiceClient(channel);
 
             LoadNodesCommand = new RelayCommand(async () => await LoadNodesAsync());
             AddNodeCommand = new RelayCommand(async () => await AddNodeAsync(), () => CanAddNode());
@@ -204,12 +203,17 @@ namespace Client.ViewModels
             AddEdgeCommand = new RelayCommand(async () => await AddEdgeAsync(), () => CanAddEdge());
             DeleteEdgeCommand = new RelayCommand(async () => await DeleteEdgeAsync(), () => SelectedEdge != null);
 
-            // команда логики статуса
             UpdateStatusesCommand = new RelayCommand(UpdateNodeStatuses);
 
+            // 1. Создаём экземпляр GraphVisualizationViewModel
+            GraphVisualizationViewModel = new GraphVisualizationViewModel();
+
+            // 2. Передаём коллекции и команду
             GraphVisualizationViewModel.Nodes = Nodes;
             GraphVisualizationViewModel.Edges = Edges;
+            GraphVisualizationViewModel.UpdateStatusesCommand = UpdateStatusesCommand;
 
+            // 3. Загружаем данные
             LoadNodesCommand.Execute(null);
             LoadEdgesCommand.Execute(null);
         }
@@ -223,7 +227,7 @@ namespace Client.ViewModels
                 foreach (var protoNode in response.Nodes)
                     Nodes.Add(protoNode.ToClientDto());
                 Greeting = $"Узлов: {Nodes.Count}";
-                UpdateNodeStatuses();
+                
             }
             catch (RpcException ex)
             {

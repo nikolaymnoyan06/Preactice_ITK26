@@ -15,9 +15,12 @@
 	<DockPanel>
 		<!-- Шторка (панель) сверху -->
 		<Border DockPanel.Dock="Top" Background="#F0F0F0" Padding="5">
-			<ToggleButton IsChecked="{Binding ShowDetails}">
-				Показать ID и тип
-			</ToggleButton>
+			<StackPanel Orientation="Horizontal" Spacing="10">
+				<ToggleButton IsChecked="{Binding ShowDetails}">
+					Показать ID и тип
+				</ToggleButton>
+				<Button Content="🎨 Обновить статусы" Command="{Binding UpdateStatusesCommand}" />
+			</StackPanel>
 		</Border>
 
 		<!-- Canvas для отрисовки графа -->

@@ -4,12 +4,19 @@ using System;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
+using System.Windows.Input;
 
 namespace Client.ViewModels
 {
     public partial class GraphVisualizationViewModel : ObservableObject
     {
         private ObservableCollection<NodeDto>? _nodes;
+        private ICommand? _updateStatusesCommand;
+        public ICommand? UpdateStatusesCommand
+        {
+            get => _updateStatusesCommand;
+            set => SetProperty(ref _updateStatusesCommand, value);
+        }
         public ObservableCollection<NodeDto>? Nodes
         {
             get => _nodes;
@@ -61,7 +68,14 @@ namespace Client.ViewModels
         public bool ShowDetails
         {
             get => _showDetails;
-            set => SetProperty(ref _showDetails, value);
+            set
+            {
+                if (SetProperty(ref _showDetails, value))
+                {
+                    // После изменения флага запросить перерисовку
+                    RedrawRequested?.Invoke(this, EventArgs.Empty);
+                }
+            }
         }
 
         // Словарь позиций узлов (доступен для View через привязку)

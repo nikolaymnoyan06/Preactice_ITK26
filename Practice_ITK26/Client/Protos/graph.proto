@@ -1,5 +1,5 @@
 ﻿syntax = "proto3";
-option csharp_namespace = "Generator_Service26_Server.Protos";
+option csharp_namespace = "Graph";
 
 package graph;
 

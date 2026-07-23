@@ -190,8 +190,7 @@ namespace Client.ViewModels
                 HttpHandler = new HttpClientHandler()
             });
             _grpcClient = new global::Graph.GraphService.GraphServiceClient(channel);
-            _grpcClient = new Graph.GraphService.GraphServiceClient(channel);
-
+            
             LoadNodesCommand = new RelayCommand(async () => await LoadNodesAsync());
             AddNodeCommand = new RelayCommand(async () => await AddNodeAsync(), () => CanAddNode());
             DeleteNodeCommand = new RelayCommand(async () => await DeleteNodeAsync(), () => SelectedNode != null);

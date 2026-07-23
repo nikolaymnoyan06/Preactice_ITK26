@@ -68,7 +68,14 @@ namespace Client.ViewModels
         public bool ShowDetails
         {
             get => _showDetails;
-            set => SetProperty(ref _showDetails, value);
+            set
+            {
+                if (SetProperty(ref _showDetails, value))
+                {
+                    // После изменения флага запросить перерисовку
+                    RedrawRequested?.Invoke(this, EventArgs.Empty);
+                }
+            }
         }
 
         // Словарь позиций узлов (доступен для View через привязку)

@@ -1,8 +1,8 @@
 ﻿syntax = "proto3";
-
+option csharp_namespace = "Generator_Service26_Server.Protos";
 package graph;
 
-service GraphService {
+service GraphGrpc {
   rpc GetNodes (Empty) returns (NodeList);
   rpc AddNode (AddNodeRequest) returns (AddNodeResponse);
   rpc DeleteNode (DeleteNodeRequest) returns (DeleteNodeResponse);
@@ -14,7 +14,7 @@ service GraphService {
 
 message Empty {}
 
-message NodeDto {
+message NodeModel{
   int32 id = 1;
   string name = 2;
   double in_value = 3;
@@ -29,11 +29,11 @@ enum NodeType {
 }
 
 message NodeList {
-  repeated NodeDto nodes = 1;
+  repeated NodeModel nodes = 1;
 }
 
 message AddNodeRequest {
-  NodeDto node = 1;
+  NodeModel node = 1;
 }
 
 message AddNodeResponse {
@@ -49,7 +49,7 @@ message DeleteNodeResponse {
   string message = 1;
 }
 
-message EdgeDto {
+message EdgeModel {
   int32 id = 1;
   int32 source_id = 2;
   int32 target_id = 3;
@@ -57,11 +57,11 @@ message EdgeDto {
 }
 
 message EdgeList {
-  repeated EdgeDto edges = 1;
+  repeated EdgeModel edges = 1;
 }
 
 message AddEdgeRequest {
-  EdgeDto edge = 1;
+  EdgeModel edge = 1;
 }
 
 message AddEdgeResponse {

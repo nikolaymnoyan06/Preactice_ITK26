@@ -1,5 +1,6 @@
 using Npgsql;
-using Generator_Service26_Server.Model.Dtos; // Подключаем DTO
+using Generator_Service26.Model.Dtos; // Подключаем DTO
+
 
 namespace Generator_Service26_Server.Services;
 
@@ -20,18 +21,19 @@ public class GraphDatabaseService
         using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync();
 
-        
-        var sql = "INSERT INTO nodes (id, name, type, value) VALUES (@id, @name, @type, @value)";
+        var sql = @"INSERT INTO nodes (id, name, type, value, incoming_value, outgoing_value) 
+                VALUES (@id, @name, @type, @value, @inVal, @outVal)";
 
         using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("id", node.Id); 
+        command.Parameters.AddWithValue("id", node.Id);
         command.Parameters.AddWithValue("name", node.Name);
-        command.Parameters.AddWithValue("type", (int)node.Type); 
-        command.Parameters.AddWithValue("value", node.Value);
+        command.Parameters.AddWithValue("type", node.Type);
+
+        command.Parameters.AddWithValue("inVal", node.InValue);
+        command.Parameters.AddWithValue("outVal", node.OutValue);
 
         await command.ExecuteNonQueryAsync();
     }
-
     // Добавление ветви (ребра)
     public async Task AddEdgeAsync(EdgeDto edge)
     {

@@ -1,6 +1,7 @@
 ﻿using Client.Dtos;
 using Client.Models.Dtos;
 
+
 namespace Client.Models
 {
     public static class MappingExtensions
